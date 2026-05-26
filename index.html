@@ -26,7 +26,7 @@
 
   // Firestore Rules의 허용 이메일 목록과 반드시 동일해야 합니다.
   const ALLOWED_EMAILS = [
-    "hulkikang@gmail.com",
+    "hulikkang@gmail.com",
     "praiseu1@gmail.com"
   ];
 
@@ -152,7 +152,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산현황 v1.2</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산현황 v1.3</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -172,7 +172,7 @@ input[type=number]{text-align:left;}
   <div class="auth-box">
     <div class="auth-title">거북투자종합회사 보안 로그인</div>
     <div class="auth-desc">허용된 Google 계정으로 로그인한 가족만 자산 데이터를 읽고 저장할 수 있습니다.</div>
-    <div class="auth-mail">허용 계정<br>wonderfulyj@gmail.com<br>hulkikang@gmail.com<br>praiseu1@gmail.com</div>
+    <div class="auth-mail">허용 계정<br>hulikkang@gmail.com<br>praiseu1@gmail.com</div>
     <button class="btn auth-btn" onclick="loginWithGoogle()">Google 계정으로 로그인</button>
   </div>
 </div>
@@ -184,7 +184,7 @@ input[type=number]{text-align:left;}
     <div class="card hi"><div class="ct">총 자산</div><div class="mv ac" id="ov-tot">-</div><div class="ms" id="ov-totr">-</div><div class="mc" id="ov-chg">-</div></div>
     <div class="card"><div class="ct">투입 원금</div><div class="mv" id="ov-pri">-</div><div class="ms">누적 투입</div></div>
     <div class="card"><div class="ct">수익금</div><div class="mv gn" id="ov-prf">-</div><div class="ms" id="ov-rt">-</div></div>
-    <div class="card"><div class="ct">USD/KRW</div><div class="mv sm" id="ov-fx"><span class="spinner"></span></div><div class="ms">실시간 자동</div></div>
+    <div class="card"><div class="ct">USD/KRW</div><div class="mv sm" id="ov-fx"><span class="spinner"></span></div><div class="ms">Yahoo FX 1m 우선</div></div>
     <div class="card"><div class="ct">ATH</div><div class="mv sm" style="color:var(--am);">6.44억</div><div class="ms">643,675,581 · 26.05.22</div></div>
   </div>
   <div class="g21">
@@ -224,23 +224,23 @@ input[type=number]{text-align:left;}
   </div>
   <div class="sec mb">직투 계좌</div>
   <div class="card mb">
-    <table><thead><tr><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
+    <table><thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
     <tbody id="ov-direct"></tbody>
-    <tfoot><tr><td colspan="3" class="nm">소계</td><td class="ac" id="ov-ds">-</td><td class="gn" id="ov-dp">-</td></tr></tfoot>
+    <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="ov-ds">-</td><td class="gn" id="ov-dp">-</td></tr></tfoot>
     </table>
   </div>
   <div class="sec mb">ISA 계좌</div>
   <div class="card mb">
-    <table><thead><tr><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
+    <table><thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
     <tbody id="ov-isa"></tbody>
-    <tfoot><tr><td colspan="3" class="nm">소계</td><td class="ac" id="ov-is">-</td><td style="color:var(--ac);font-size:11px;" id="ov-ip">-</td></tr></tfoot>
+    <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="ov-is">-</td><td style="color:var(--ac);font-size:11px;" id="ov-ip">-</td></tr></tfoot>
     </table>
   </div>
   <div class="sec mb">RSA / IRP·DC</div>
   <div class="card">
-    <table><thead><tr><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
+    <table><thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
     <tbody id="ov-pen"></tbody>
-    <tfoot><tr><td colspan="3" class="nm">소계</td><td class="ac" id="ov-ps">-</td><td style="color:var(--am);font-size:11px;" id="ov-pp">-</td></tr></tfoot>
+    <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="ov-ps">-</td><td style="color:var(--am);font-size:11px;" id="ov-pp">-</td></tr></tfoot>
     </table>
   </div>
 </div>
@@ -251,7 +251,7 @@ input[type=number]{text-align:left;}
     <div class="card hi"><div class="ct">실시간 총 자산</div><div class="mv ac" id="rt-tot">-</div><div class="ms" id="rt-totr">-</div></div>
     <div class="card"><div class="ct">전일 대비</div><div class="mv" id="rt-chg">-</div><div class="ms" id="rt-chgp">-</div></div>
     <div class="card"><div class="ct">수익금</div><div class="mv gn" id="rt-prf">-</div><div class="ms" id="rt-rtp">-</div></div>
-    <div class="card"><div class="ct">USD/KRW (자동)</div><div class="mv sm" id="rt-fx"><span class="spinner"></span></div><div class="ms">exchangerate-api</div></div>
+    <div class="card"><div class="ct">USD/KRW (자동)</div><div class="mv sm" id="rt-fx"><span class="spinner"></span></div><div class="ms">Yahoo FX 1m 우선</div></div>
     <div class="card"><div class="ct">ATH 대비</div><div class="mv sm" id="rt-ath">-</div><div class="ms">643,675,581</div></div>
   </div>
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
@@ -329,7 +329,6 @@ input[type=number]{text-align:left;}
   <div class="sec mb">수량 입력</div>
   <div style="display:flex;gap:8px;margin-bottom:14px;">
     <button class="btn" onclick="saveDY()">Firebase 저장</button>
-    <button class="btn rd sm" onclick="resetDY()">기본값 복원</button>
     <div style="font-size:12px;color:var(--t3);align-self:center;">수량 변경 후 저장하면 실시간/개요에 즉시 반영됩니다</div>
   </div>
   <div class="card">
@@ -506,23 +505,70 @@ function getLiveTrendLog(tot,pri){
 
 function toast(msg,err=false){const w=document.getElementById('tw');const d=document.createElement('div');d.className='toast'+(err?' err':'');d.textContent=msg;w.appendChild(d);setTimeout(()=>d.remove(),3000);}
 
+function parseFxCandidate(v){
+  const n=Number(v);
+  return Number.isFinite(n)&&n>900&&n<2500?n:null;
+}
+
+function parseStooqFxCsv(txt){
+  if(!txt)return null;
+  const lines=String(txt).trim().split(/\r?\n/);
+  if(lines.length<2)return null;
+  const headers=lines[0].split(',').map(x=>x.trim().toLowerCase());
+  const vals=lines[1].split(',').map(x=>x.trim());
+  const closeIdx=headers.indexOf('close');
+  const idx=closeIdx>=0?closeIdx:vals.length-2;
+  return parseFxCandidate(vals[idx]);
+}
+
+function parseYahooFx(data){
+  const r=data?.chart?.result?.[0];
+  if(!r)return null;
+  const meta=r.meta||{};
+  const q=r.indicators?.quote?.[0]||{};
+  const close=lastFinite(q.close);
+  return parseFxCandidate(meta.regularMarketPrice||meta.previousClose||close);
+}
+
 async function fetchFX(updateScreen=true, notify=false){
   const oldFx=Number(RT.fx)||1504.77;
+  const stamp=Date.now();
   const sources=[
-    {name:'ExchangeRateAPI',url:'https://api.exchangerate-api.com/v4/latest/USD',parse:d=>d?.rates?.KRW},
-    {name:'ER-API',url:'https://open.er-api.com/v6/latest/USD',parse:d=>d?.rates?.KRW},
-    {name:'Frankfurter',url:'https://api.frankfurter.app/latest?from=USD&to=KRW',parse:d=>d?.rates?.KRW},
-    {name:'CurrencyAPI',url:'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',parse:d=>d?.usd?.krw}
+    {
+      name:'Yahoo FX 1m',
+      url:`https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d&_=${stamp}`,
+      type:'json',
+      parse:parseYahooFx
+    },
+    {
+      name:'Yahoo FX 5m',
+      url:`https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=5m&range=1d&_=${stamp}`,
+      type:'json',
+      parse:parseYahooFx
+    },
+    {
+      name:'Stooq USDKRW',
+      url:`https://stooq.com/q/l/?s=usdkrw&f=sd2t2ohlcv&h&e=csv&_=${stamp}`,
+      type:'text',
+      parse:parseStooqFxCsv
+    },
+    {name:'ER-API',url:`https://open.er-api.com/v6/latest/USD?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
+    {name:'ExchangeRateAPI',url:`https://api.exchangerate-api.com/v4/latest/USD?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
+    {name:'Frankfurter',url:`https://api.frankfurter.app/latest?from=USD&to=KRW&_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
+    {name:'CurrencyAPI',url:`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.usd?.krw)}
   ];
 
+  const tried=[];
   for(const src of sources){
     try{
-      const data=await fetchJsonNoCache(src.url);
-      const fx=Number(src.parse(data));
-      if(Number.isFinite(fx)&&fx>900&&fx<2500){
+      const raw=src.type==='text'?await fetchTextNoCache(src.url):await fetchJsonNoCache(src.url);
+      const fx=src.parse(raw);
+      tried.push(src.name+(fx?' OK':' 실패'));
+      if(fx){
         RT.fx=fx;
         RT.fxSource=src.name;
         RT.fxTime=new Date().toLocaleTimeString('ko-KR');
+        RT.fxTried=tried;
         localStorage.setItem('ttg_rt3',JSON.stringify(RT));
         ['ov-fx','rt-fx'].forEach(id=>{
           const e=document.getElementById(id);
@@ -538,11 +584,15 @@ async function fetchFX(updateScreen=true, notify=false){
         }
         return RT.fx;
       }
-    }catch(e){}
+    }catch(e){
+      tried.push(src.name+' 오류');
+    }
   }
 
+  RT.fxTried=tried;
+  localStorage.setItem('ttg_rt3',JSON.stringify(RT));
   ['ov-fx','rt-fx'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=oldFx.toLocaleString(undefined,{maximumFractionDigits:2});});
-  if(notify)toast('환율 API 응답 실패: 회사망/브라우저/CORS 차단 가능성이 있습니다',true);
+  if(notify)toast('환율 API 응답 실패: Yahoo/Stooq/ER-API 모두 실패. 회사망/CORS 차단 가능성이 큽니다',true);
   return oldFx;
 }
 
@@ -760,7 +810,7 @@ function renderHoldingsGroup(tbodyId,subId,pctId,types,total,fx){
     const v=h._v;sub+=v;
     const pr=h.c==='USD'?'$'+h.p.toLocaleString(undefined,{maximumFractionDigits:2}):'₩'+h.p.toLocaleString();
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td><span class="tk ${h.cl}">${h.tk}</span></td><td>${h.q.toLocaleString()}</td><td style="color:var(--ac);font-size:12px;">${pr}</td><td class="ac">${fmtM(v)}</td><td style="font-size:11px;color:var(--t2);">${(v/total*100).toFixed(2)}%</td>`;
+    tr.innerHTML=`<td class="nm">${h.a}</td><td class="nm">${h.e}</td><td><span class="tk ${h.cl}">${h.tk}</span></td><td>${h.q.toLocaleString()}</td><td style="color:var(--ac);font-size:12px;">${pr}</td><td class="ac">${fmtM(v)}</td><td style="font-size:11px;color:var(--t2);">${(v/total*100).toFixed(2)}%</td>`;
     tb.appendChild(tr);
   });
   const se=document.getElementById(subId);if(se)se.textContent='₩'+fmtW(sub);
