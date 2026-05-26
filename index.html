@@ -102,7 +102,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산현황</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산현황 V1.1</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -196,6 +196,7 @@ input[type=number]{text-align:left;}
   </div>
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
     <button class="btn" onclick="refreshPrices()"><span class="spinner" id="rspin" style="display:none;"></span> 시세 새로고침</button>
+    <button class="btn sm" onclick="refreshFXManual()">환율 새로고침</button>
     <button class="btn am" onclick="saveLogNow()">오늘 LOG 저장</button>
     <div style="font-size:12px;color:var(--t3);">수량 변경은 [수량입력] 탭에서</div>
     <span class="lu" id="rt-last">-</span>
@@ -445,16 +446,48 @@ function getLiveTrendLog(tot,pri){
 
 function toast(msg,err=false){const w=document.getElementById('tw');const d=document.createElement('div');d.className='toast'+(err?' err':'');d.textContent=msg;w.appendChild(d);setTimeout(()=>d.remove(),3000);}
 
-async function fetchFX(updateScreen=true){
-  try{
-    const r=await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-    const data=await r.json();
-    RT.fx=data.rates.KRW;
-    localStorage.setItem('ttg_rt3',JSON.stringify(RT));
-    ['ov-fx','rt-fx'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=RT.fx.toLocaleString(undefined,{maximumFractionDigits:2});});
-    if(updateScreen){renderOV();renderRT();if(document.getElementById('pg-dy')?.classList.contains('on'))renderDY();}
-    return RT.fx;
-  }catch(e){return RT.fx;}
+async function fetchFX(updateScreen=true, notify=false){
+  const oldFx=Number(RT.fx)||1504.77;
+  const sources=[
+    {name:'ExchangeRateAPI',url:'https://api.exchangerate-api.com/v4/latest/USD',parse:d=>d?.rates?.KRW},
+    {name:'ER-API',url:'https://open.er-api.com/v6/latest/USD',parse:d=>d?.rates?.KRW},
+    {name:'Frankfurter',url:'https://api.frankfurter.app/latest?from=USD&to=KRW',parse:d=>d?.rates?.KRW},
+    {name:'CurrencyAPI',url:'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',parse:d=>d?.usd?.krw}
+  ];
+
+  for(const src of sources){
+    try{
+      const data=await fetchJsonNoCache(src.url);
+      const fx=Number(src.parse(data));
+      if(Number.isFinite(fx)&&fx>900&&fx<2500){
+        RT.fx=fx;
+        RT.fxSource=src.name;
+        RT.fxTime=new Date().toLocaleTimeString('ko-KR');
+        localStorage.setItem('ttg_rt3',JSON.stringify(RT));
+        ['ov-fx','rt-fx'].forEach(id=>{
+          const e=document.getElementById(id);
+          if(e)e.textContent=RT.fx.toLocaleString(undefined,{maximumFractionDigits:2});
+        });
+        const msg=`환율 ${RT.fx.toLocaleString(undefined,{maximumFractionDigits:2})} · ${src.name} · ${RT.fxTime}`;
+        const lu=document.getElementById('lu');if(lu)lu.textContent=msg;
+        const rtLast=document.getElementById('rt-last');if(rtLast)rtLast.textContent=msg;
+        if(updateScreen){renderOV();renderRT();renderLogChart();if(document.getElementById('pg-dy')?.classList.contains('on'))renderDY();}
+        if(notify){
+          const diff=fx-oldFx;
+          toast(`환율 갱신 완료: ${fx.toLocaleString(undefined,{maximumFractionDigits:2})}원 (${diff>=0?'+':''}${diff.toFixed(2)}) · ${src.name}`);
+        }
+        return RT.fx;
+      }
+    }catch(e){}
+  }
+
+  ['ov-fx','rt-fx'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=oldFx.toLocaleString(undefined,{maximumFractionDigits:2});});
+  if(notify)toast('환율 API 응답 실패: 회사망/브라우저/CORS 차단 가능성이 있습니다',true);
+  return oldFx;
+}
+
+async function refreshFXManual(){
+  await fetchFX(true,true);
 }
 
 function parseMoney(v){
