@@ -202,7 +202,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v1.6</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v1.7</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -577,6 +577,27 @@ function paddedScale(values,pad=5e7){
   if(!nums.length)return {};
   const mn=Math.min(...nums), mx=Math.max(...nums);
   return {min:Math.max(0,mn-pad),max:mx+pad};
+}
+function formatYMDFromDays(totalDays){
+  const days=Math.max(0,Math.ceil(Number(totalDays)||0));
+  if(days===0)return '0일';
+  const start=new Date();
+  const end=new Date(start);
+  end.setDate(end.getDate()+days);
+  let years=end.getFullYear()-start.getFullYear();
+  let months=end.getMonth()-start.getMonth();
+  let remain=end.getDate()-start.getDate();
+  if(remain<0){
+    months-=1;
+    const lastDayOfPrevEndMonth=new Date(end.getFullYear(),end.getMonth(),0).getDate();
+    remain+=lastDayOfPrevEndMonth;
+  }
+  if(months<0){years-=1;months+=12;}
+  const parts=[];
+  if(years>0)parts.push(years+'년');
+  if(months>0)parts.push(months+'개월');
+  if(remain>0||parts.length===0)parts.push(remain+'일');
+  return parts.join(' ')+' · 총 '+days.toLocaleString()+'일';
 }
 function sortedHoldings(rows,total,sort){
   const key=sort?.key||'value', dir=sort?.dir||'desc', fx=RT.fx||1504.77;
@@ -979,7 +1000,7 @@ function renderOV(){
   if(rem<=0)daysText='목표 달성';
   else if(gr>0){
     const years=Math.log(goal/tot)/Math.log(1+gr/100);
-    daysText=Number.isFinite(years)?Math.max(0,Math.ceil(years*365.25)).toLocaleString()+'일':'계산불가';
+    daysText=Number.isFinite(years)?formatYMDFromDays(years*365.25):'계산불가';
   }else daysText='성장률 0%';
   se('g-pct',pct.toFixed(2)+'%');
   se('g-rem','잔여: '+fmtO(rem)+' · 남은 일수: '+daysText);
@@ -992,10 +1013,14 @@ function renderOV(){
   const trendLog=getLiveTrendLog(tot,pri);
   if(trendLog.length>0){
     const trendVals=trendLog.map(l=>l.asset);
-    const trendScale=paddedScale(trendVals,5e7);
+    const trendPriVals=trendLog.map(l=>Number(l.principal)||0);
+    const trendScale=paddedScale([...trendVals,...trendPriVals],5e7);
     charts['trend']=new Chart(document.getElementById('c-trend'),{type:'line',
-      data:{labels:trendLog.map(l=>l.date.slice(5)),datasets:[{data:trendVals,borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.5,pointRadius:1,tension:0.4}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.parsed.y/1e8).toFixed(2)+'억'}}},
+      data:{labels:trendLog.map(l=>l.date.slice(5)),datasets:[
+        {label:'총 자산',data:trendVals,borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.8,pointRadius:1,tension:0.4},
+        {label:'투입 원금',data:trendPriVals,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.05)',fill:false,borderWidth:1.4,pointRadius:0,tension:0.25,borderDash:[5,3]},
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{boxWidth:10,color:'#8b949e',font:{size:10}}},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${(c.parsed.y/1e8).toFixed(2)}억`}}},
       scales:{x:{ticks:{font:{size:10},color:'#484f58',maxTicksLimit:10},grid:{color:'rgba(255,255,255,0.03)'}},y:{...trendScale,ticks:{callback:v=>(v/1e8).toFixed(1)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
   }
   const st={qm:0,ql:0,sp:0,sg:0};H.forEach(h=>{st[h.cl]+=val(h,fx);});
@@ -1253,16 +1278,28 @@ function renderLG(){
 
 function renderLogChart(){
   dc('log');if(!LOG.length)return;
-  const totalVals=LOG.map(l=>l.asset);
-  const profitVals=LOG.map(l=>l.asset-l.principal);
-  const logScale=paddedScale([...totalVals,...profitVals],5e7);
-  charts['log']=new Chart(document.getElementById('c-log'),{type:'line',
+  const totalVals=LOG.map(l=>Number(l.asset)||0);
+  const principalVals=LOG.map(l=>Number(l.principal)||0);
+  const rateVals=LOG.map(l=>{
+    const p=Number(l.principal)||0;
+    return p?((Number(l.asset)||0)-p)/p*100:0;
+  });
+  const logScale=paddedScale([...totalVals,...principalVals],5e7);
+  charts['log']=new Chart(document.getElementById('c-log'),{type:'bar',
     data:{labels:LOG.map(l=>l.date.slice(5)),datasets:[
-      {label:'총 자산',data:totalVals,borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.5,pointRadius:1,tension:0.4},
-      {label:'수익금',data:profitVals,borderColor:'#10b981',fill:false,borderWidth:1,pointRadius:0,tension:0.4,borderDash:[4,3]},
+      {type:'line',label:'총 자산',data:totalVals,yAxisID:'y',borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:false,borderWidth:1.8,pointRadius:1,tension:0.35,order:1},
+      {type:'line',label:'투입 원금',data:principalVals,yAxisID:'y',borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.05)',fill:false,borderWidth:1.5,pointRadius:0,tension:0.25,borderDash:[5,3],order:2},
+      {type:'bar',label:'수익률',data:rateVals,yAxisID:'y1',backgroundColor:'rgba(59,130,246,0.35)',borderWidth:0,borderRadius:2,order:3},
     ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.parsed.y/1e8).toFixed(2)+'억'}}},
-    scales:{x:{ticks:{font:{size:10},color:'#484f58',maxTicksLimit:12},grid:{color:'rgba(255,255,255,0.03)'}},y:{...logScale,ticks:{callback:v=>(v/1e8).toFixed(1)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{boxWidth:10,color:'#8b949e',font:{size:10}}},tooltip:{callbacks:{label:c=>{
+      if(c.dataset.yAxisID==='y1')return `${c.dataset.label}: ${c.parsed.y.toFixed(2)}%`;
+      return `${c.dataset.label}: ${(c.parsed.y/1e8).toFixed(2)}억`;
+    }}}},
+    scales:{
+      x:{ticks:{font:{size:10},color:'#484f58',maxTicksLimit:12},grid:{color:'rgba(255,255,255,0.03)'}},
+      y:{...logScale,position:'left',ticks:{callback:v=>(v/1e8).toFixed(1)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}},
+      y1:{position:'right',ticks:{callback:v=>v.toFixed(0)+'%',font:{size:10},color:'#60a5fa'},grid:{drawOnChartArea:false}}
+    }}});
 }
 
 
