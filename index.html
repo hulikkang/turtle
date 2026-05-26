@@ -8,6 +8,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
   const firebaseConfig = {
     apiKey: "AIzaSyC-j6-RqOLj-qf8foM-9_dRsSNvLZ9OpB4",
     authDomain: "turtleinvestmentcompany.firebaseapp.com",
@@ -19,10 +20,51 @@
   };
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  const auth = getAuth(app);
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+
+  // Firestore Rules의 허용 이메일 목록과 반드시 동일해야 합니다.
+  const ALLOWED_EMAILS = [
+    "hulkikang@gmail.com",
+    "praiseu1@gmail.com"
+  ];
+
   window._db = db;
+  window._auth = auth;
+  window._user = null;
+  window._authReady = false;
+  window._fbReady = false;
+  window._allowedEmails = ALLOWED_EMAILS;
   window._fs = { doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, orderBy, query };
-  window._fbReady = true;
-  window.dispatchEvent(new Event('fbready'));
+
+  window.loginWithGoogle = async () => {
+    try { await signInWithPopup(auth, provider); }
+    catch (e) { alert('Google 로그인 실패: ' + (e?.message || e)); }
+  };
+  window.logoutGoogle = async () => {
+    try { await signOut(auth); }
+    catch (e) { alert('로그아웃 실패: ' + (e?.message || e)); }
+  };
+
+  onAuthStateChanged(auth, async (user) => {
+    window._authReady = true;
+    if (!user) {
+      window._user = null;
+      window._fbReady = false;
+      window.dispatchEvent(new CustomEvent('authchanged', { detail: { user: null } }));
+      return;
+    }
+    if (!ALLOWED_EMAILS.includes(user.email)) {
+      alert(`허용되지 않은 계정입니다: ${user.email}`);
+      await signOut(auth);
+      return;
+    }
+    window._user = user;
+    window._fbReady = true;
+    window.dispatchEvent(new CustomEvent('authchanged', { detail: { user } }));
+    window.dispatchEvent(new Event('fbready'));
+  });
 </script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -41,6 +83,14 @@ html,body{background:var(--bg);color:var(--t1);font-family:system-ui,-apple-syst
 .tab:hover{color:var(--t1);}
 .tab.on{color:var(--ac);border-bottom-color:var(--ac);}
 .nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+
+.auth-wall{position:fixed;inset:0;background:rgba(13,17,23,.96);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;}
+.auth-wall.off{display:none;}
+.auth-box{width:min(470px,100%);background:var(--bg2);border:1px solid rgba(0,212,170,.28);border-radius:12px;padding:24px;box-shadow:0 20px 80px rgba(0,0,0,.4);}
+.auth-title{font-size:22px;font-weight:800;color:var(--ac);margin-bottom:8px;}
+.auth-desc{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:14px;}
+.auth-mail{font-family:monospace;font-size:12px;color:var(--t3);line-height:1.7;margin:12px 0 16px;}
+.auth-btn{width:100%;padding:11px 16px;font-size:14px;font-weight:700;}
 .badge{font-size:11px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.25);color:var(--ac);padding:3px 10px;border-radius:20px;white-space:nowrap;}
 .sync-dot{width:9px;height:9px;border-radius:50%;background:#ef4444;flex-shrink:0;}
 .sync-dot.ok{background:#10b981;}
@@ -102,7 +152,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산현황 V1.1</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산현황 v1.2</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -112,10 +162,20 @@ input[type=number]{text-align:left;}
   </div>
   <div class="nav-right">
     <div class="sync-dot" id="sync-dot"></div>
+    <div class="lu" id="auth-user">로그인 필요</div>
+    <button class="btn sm" id="auth-btn" onclick="loginWithGoogle()">로그인</button>
     <div class="lu" id="lu">시세 로딩중...</div>
     <div class="badge">2045 · 100억</div>
   </div>
 </nav>
+<div class="auth-wall" id="auth-wall">
+  <div class="auth-box">
+    <div class="auth-title">거북투자종합회사 보안 로그인</div>
+    <div class="auth-desc">허용된 Google 계정으로 로그인한 가족만 자산 데이터를 읽고 저장할 수 있습니다.</div>
+    <div class="auth-mail">허용 계정<br>wonderfulyj@gmail.com<br>hulkikang@gmail.com<br>praiseu1@gmail.com</div>
+    <button class="btn auth-btn" onclick="loginWithGoogle()">Google 계정으로 로그인</button>
+  </div>
+</div>
 <div class="toast-wrap" id="tw"></div>
 
 <!-- OVERVIEW -->
@@ -647,12 +707,12 @@ async function refreshPrices(silent=false){
 }
 
 async function fbSave(col,id,data){
-  if(!window._fbReady)return false;
+  if(!window._fbReady||!window._user){toast('Google 로그인 후 저장 가능합니다',true);return false;}
   try{const{doc,setDoc}=window._fs;await setDoc(doc(window._db,col,id),data);document.getElementById('sync-dot').className='sync-dot ok';return true;}
   catch(e){document.getElementById('sync-dot').className='sync-dot';return false;}
 }
 async function fbLoad(){
-  if(!window._fbReady)return;
+  if(!window._fbReady||!window._user)return;
   try{
     const{doc,getDoc,collection,getDocs,orderBy,query}=window._fs;
     const hs=await getDoc(doc(window._db,'config','holdings'));
@@ -1067,11 +1127,33 @@ async function saveDY(){
 }
 function resetDY(){if(confirm('기본값으로 복원할까요?')){H=JSON.parse(JSON.stringify(DEF_H));localStorage.setItem('ttg_h3',JSON.stringify(H));renderDY();renderOV();toast('기본값 복원 완료');}}
 
-// INIT
+// AUTH UI + INIT
+function updateAuthUI(user){
+  const wall=document.getElementById('auth-wall');
+  const au=document.getElementById('auth-user');
+  const ab=document.getElementById('auth-btn');
+  if(user){
+    wall?.classList.add('off');
+    if(au)au.textContent=user.email;
+    if(ab){ab.textContent='로그아웃';ab.onclick=()=>logoutGoogle();}
+    document.getElementById('sync-dot').className='sync-dot ok';
+  }else{
+    wall?.classList.remove('off');
+    if(au)au.textContent='로그인 필요';
+    if(ab){ab.textContent='로그인';ab.onclick=()=>loginWithGoogle();}
+    document.getElementById('sync-dot').className='sync-dot';
+  }
+}
+
 const _lgd=document.getElementById('lg-d');if(_lgd)_lgd.valueAsDate=new Date();
-window.addEventListener('fbready',fbLoad);
-if(window._fbReady)fbLoad();
-else{setTimeout(()=>{if(!window._fbReady){renderAll();startAutoRefresh();}},2000);}
+window.addEventListener('authchanged',e=>{
+  updateAuthUI(e.detail.user);
+  if(e.detail.user){fbLoad();}
+});
+window.addEventListener('fbready',()=>{if(window._user)fbLoad();});
+if(window._authReady){updateAuthUI(window._user);if(window._user)fbLoad();}
+else{updateAuthUI(null);}
+setTimeout(()=>{if(window._authReady&&window._user){renderAll();startAutoRefresh();}},1000);
 </script>
 </body>
 </html>
