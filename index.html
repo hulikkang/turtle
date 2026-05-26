@@ -218,8 +218,9 @@ input[type=number]{text-align:left;}
   <div class="sec mb">엑셀 과거 데이터 일괄 입력</div>
   <div class="card mb">
     <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:8px;">
-      엑셀에서 <b>날짜 / 총자산 / 누적수익금 / 누적원금 / 추가투입금</b> 형태로 복사해서 붙여넣으면 LOG에 일괄 반영됩니다.
-      추가투입금 칸이 없으면 누적원금 증가분으로 자동 계산합니다.
+      엑셀에서 <b>날짜 / 총자산 / 누적수익금 / 누적원금 / 추가투입금</b> 형태로 복사해서 붙여넣으면 LOG에 일괄 반영됩니다.<br>
+      숫자 쉼표(예: 495,185,313)는 그대로 두세요. 날짜는 2026-02-24 / 2026.02.24 / 26.02.24 모두 인식합니다.<br>
+      총자산 옆에 전일대비만 붙여넣어도 됩니다. 누적원금이 없으면 기존 LOG/기본값에서 자동 보정합니다.
     </div>
     <textarea id="lg-import" style="width:100%;min-height:180px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:9px 10px;border-radius:5px;font-family:monospace;font-size:12px;outline:none;resize:vertical;">날짜	총자산	누적수익금	누적원금
 2025-12-01	₩372,613,268	₩14,261,985	₩358,351,283
@@ -244,6 +245,7 @@ input[type=number]{text-align:left;}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
       <button class="btn" onclick="importExcelLog()">엑셀 데이터 LOG 반영</button>
       <button class="btn am" onclick="uploadAllLog()">현재 LOG 전체 Firebase 업로드</button>
+      <button class="btn rd sm" onclick="repairBadLog()">깨진 LOG 자동복구</button>
       <button class="btn rd sm" onclick="document.getElementById('lg-import').value=''">입력창 비우기</button>
     </div>
   </div>
@@ -616,48 +618,142 @@ async function delLog(d){LOG=LOG.filter(l=>l.date!==d);localStorage.setItem('ttg
 async function clearLog(){if(confirm('전체 삭제?')){LOG=[];localStorage.setItem('ttg_log4',JSON.stringify(LOG));renderLG();renderLogChart();}}
 
 
+function normalizeDateToken(v){
+  if(v===undefined||v===null)return null;
+  let s=String(v).trim();
+  if(!s)return null;
+  s=s.replace(/[./]/g,'-');
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m){
+    const y=m[1], mo=m[2].padStart(2,'0'), d=m[3].padStart(2,'0');
+    return `${y}-${mo}-${d}`;
+  }
+  m=s.match(/^(\d{2})-(\d{1,2})-(\d{1,2})$/);
+  if(m){
+    const y=Number(m[1])>=70?`19${m[1]}`:`20${m[1]}`;
+    const mo=m[2].padStart(2,'0'), d=m[3].padStart(2,'0');
+    return `${y}-${mo}-${d}`;
+  }
+  return null;
+}
+
 function parseWon(v){
   if(v===undefined||v===null)return null;
   let s=String(v).trim();
   if(!s)return null;
-  const neg=s.includes('-');
+  let neg=false;
+  if(/^\(.*\)$/.test(s)){neg=true;s=s.slice(1,-1);}
+  if(s.includes('-'))neg=true;
   s=s.replace(/[₩,\s]/g,'').replace(/[^\d.]/g,'');
   if(!s)return null;
   const n=Number(s);
   return Number.isFinite(n)?(neg?-n:n):null;
 }
 
+function extractExcelCells(line){
+  const trimmed=String(line||'').trim();
+  if(!trimmed)return [];
+
+  // 1) 탭 복사는 가장 정확하다. 금액 안의 쉼표는 절대 구분자로 보지 않는다.
+  if(trimmed.includes('\t')){
+    return trimmed.split(/\t+/).map(x=>x.trim()).filter(x=>x!=='' && x!=='-');
+  }
+
+  // 2) 공백 복사: 날짜 + 금액 토큰을 정규식으로만 추출한다.
+  //    예: 26.02.24 495,185,313 -4,640,525
+  const tokens=[];
+  const re=/(\d{2,4}[.\-\/]\d{1,2}[.\-\/]\d{1,2})|[-+]?₩?\(?\d{1,3}(?:,\d{3})*(?:\.\d+)?\)?|[-+]?₩?\(?\d+(?:\.\d+)?\)?/g;
+  let m;
+  while((m=re.exec(trimmed))!==null)tokens.push(m[0]);
+  return tokens;
+}
+
+function isValidMoney(n){return Number.isFinite(n) && Math.abs(n)>=10000000;}
+function isLikelyPrincipal(n){return Number.isFinite(n) && n>=100000000;}
+
+function cleanLogBase(){
+  const base=new Map();
+  // 기본 내장 LOG를 먼저 깐다.
+  DEF_LOG.forEach(l=>{
+    if(l && normalizeDateToken(l.date) && isValidMoney(l.asset) && isValidMoney(l.principal)){
+      base.set(normalizeDateToken(l.date), {date:normalizeDateToken(l.date), asset:Math.round(l.asset), principal:Math.round(l.principal), added:Math.round(l.added||0)});
+    }
+  });
+  // 사용자가 직접 저장한 정상 LOG는 살린다. 단, 495원 같은 오염값은 버린다.
+  LOG.forEach(l=>{
+    const d=normalizeDateToken(l.date);
+    if(d && isValidMoney(Number(l.asset)) && isValidMoney(Number(l.principal))){
+      base.set(d, {date:d, asset:Math.round(Number(l.asset)), principal:Math.round(Number(l.principal)), added:Math.round(Number(l.added)||0)});
+    }
+  });
+  return base;
+}
+
+function fallbackPrincipal(date, baseMap){
+  const d=normalizeDateToken(date);
+  if(baseMap.has(d) && isValidMoney(baseMap.get(d).principal))return baseMap.get(d).principal;
+  const past=[...baseMap.values()].filter(l=>l.date<d && isValidMoney(l.principal)).sort((a,b)=>b.date.localeCompare(a.date));
+  if(past.length)return past[0].principal;
+  const future=[...baseMap.values()].filter(l=>l.date>d && isValidMoney(l.principal)).sort((a,b)=>a.date.localeCompare(b.date));
+  if(future.length)return future[0].principal;
+  return RT.pri||524313920;
+}
+
 async function importExcelLog(){
   const raw=document.getElementById('lg-import').value||'';
   const lines=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  const baseMap=cleanLogBase();
   const parsed=[];
+
   for(const line of lines){
-    const cells=line.split(/\t|,/).map(x=>x.trim());
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(cells[0]||''))continue;
-    const asset=parseWon(cells[1]);
-    const principal=parseWon(cells[3]!==undefined?cells[3]:cells[2]);
-    let added=parseWon(cells[4]);
-    if(asset===null||principal===null)continue;
-    parsed.push({date:cells[0],asset:Math.round(asset),principal:Math.round(principal),added:added===null?null:Math.round(added)});
-  }
-  if(!parsed.length)return toast('가져올 행이 없습니다. 날짜/총자산/누적원금 형식을 확인하세요',true);
+    const cells=extractExcelCells(line);
+    const date=normalizeDateToken(cells[0]);
+    if(!date)continue;
 
-  parsed.sort((a,b)=>a.date.localeCompare(b.date));
-  for(let i=0;i<parsed.length;i++){
-    if(parsed[i].added===null){
-      const prev=LOG.filter(l=>l.date<parsed[i].date).sort((a,b)=>b.date.localeCompare(a.date))[0] || parsed[i-1];
-      parsed[i].added=prev?Math.max(0,parsed[i].principal-prev.principal):0;
+    const nums=cells.slice(1).map(parseWon).filter(n=>n!==null);
+    if(!nums.length)continue;
+
+    const asset=nums[0];
+    if(!isValidMoney(asset))continue;
+
+    // 해석 규칙
+    // 4개 이상: 날짜 / 총자산 / 누적수익금 / 누적원금 / 추가투입금
+    // 3개: 날짜 / 총자산 / 누적원금 또는 날짜 / 총자산 / 전일대비
+    // 2개: 날짜 / 총자산 / 전일대비
+    // 1개: 날짜 / 총자산
+    let principal=null, added=null;
+    if(nums.length>=3 && isLikelyPrincipal(nums[2]))principal=nums[2];
+    else if(nums.length>=2 && isLikelyPrincipal(nums[1]))principal=nums[1];
+    else principal=fallbackPrincipal(date,baseMap);
+
+    if(nums.length>=4)added=nums[3];
+    if(added===null){
+      const prev=[...baseMap.values(),...parsed].filter(l=>l.date<date && isValidMoney(l.principal)).sort((a,b)=>b.date.localeCompare(a.date))[0];
+      added=prev?Math.max(0,Math.round(principal-prev.principal)):0;
     }
+
+    const entry={date,asset:Math.round(asset),principal:Math.round(principal),added:Math.round(added||0)};
+    parsed.push(entry);
+    baseMap.set(date,entry);
   }
 
-  parsed.forEach(entry=>{
-    LOG=LOG.filter(l=>l.date!==entry.date);
-    LOG.push(entry);
-  });
-  LOG.sort((a,b)=>a.date.localeCompare(b.date));
+  if(!parsed.length)return toast('가져올 행이 없습니다. 날짜/총자산 형식을 확인하세요',true);
+
+  const merged=cleanLogBase();
+  parsed.forEach(entry=>merged.set(entry.date,entry));
+  LOG=[...merged.values()].sort((a,b)=>a.date.localeCompare(b.date));
   localStorage.setItem('ttg_log4',JSON.stringify(LOG));
-  renderLG();renderLogChart();renderOV();
-  toast(`${parsed.length}개 과거 LOG 반영 완료`);
+  renderLG();renderLogChart();renderOV();renderRT();
+  toast(`${parsed.length}개 과거 LOG 반영 완료 · 쉼표 금액 정상 인식`);
+}
+
+function repairBadLog(){
+  const merged=cleanLogBase();
+  const before=LOG.length;
+  LOG=[...merged.values()].sort((a,b)=>a.date.localeCompare(b.date));
+  localStorage.setItem('ttg_log4',JSON.stringify(LOG));
+  renderLG();renderLogChart();renderOV();renderRT();
+  toast(`깨진 LOG 정리 완료: ${before}개 → ${LOG.length}개`);
 }
 
 async function uploadAllLog(){
