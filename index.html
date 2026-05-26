@@ -214,6 +214,40 @@ input[type=number]{text-align:left;}
       <button class="btn rd sm" onclick="clearLog()">전체삭제</button>
     </div>
   </div>
+
+  <div class="sec mb">엑셀 과거 데이터 일괄 입력</div>
+  <div class="card mb">
+    <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:8px;">
+      엑셀에서 <b>날짜 / 총자산 / 누적수익금 / 누적원금 / 추가투입금</b> 형태로 복사해서 붙여넣으면 LOG에 일괄 반영됩니다.
+      추가투입금 칸이 없으면 누적원금 증가분으로 자동 계산합니다.
+    </div>
+    <textarea id="lg-import" style="width:100%;min-height:180px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:9px 10px;border-radius:5px;font-family:monospace;font-size:12px;outline:none;resize:vertical;">날짜	총자산	누적수익금	누적원금
+2025-12-01	₩372,613,268	₩14,261,985	₩358,351,283
+2025-12-31	₩367,843,904	₩9,492,621	₩358,351,283
+2026-01-26	₩373,950,790	₩11,873,104	₩362,077,686
+2026-01-30	₩379,735,591	₩12,184,884	₩367,550,707
+2026-02-06	₩374,671,233	₩6,810,526	₩367,860,707
+2026-02-09	₩378,922,676	₩9,661,969	₩369,260,707
+2026-02-10	₩377,080,602	₩7,719,895	₩369,360,707
+2026-02-12	₩370,072,257	₩-2,611,252	₩372,683,509
+2026-02-19	₩458,133,306	₩-256,203	₩458,389,509
+2026-02-20	₩460,653,859	₩1,674,350	₩458,979,509
+2026-02-23	₩492,874,879	₩-7,271,925	₩500,146,804
+2026-04-02	₩496,652,562	₩-3,494,242	₩500,146,804
+2026-04-13	₩517,603,173	₩15,956,369	₩501,646,804
+2026-04-14	₩526,092,092	₩22,706,157	₩503,385,935
+2026-04-30	₩563,900,241	₩55,646,532	₩508,253,709
+2026-05-08	₩595,286,505	₩87,032,796	₩508,253,709
+2026-05-13	₩627,275,715	₩103,550,672	₩523,725,043
+2026-05-19	₩624,460,195	₩100,146,275	₩524,313,920
+2026-05-22	₩643,439,049	₩119,125,129	₩524,313,920</textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+      <button class="btn" onclick="importExcelLog()">엑셀 데이터 LOG 반영</button>
+      <button class="btn am" onclick="uploadAllLog()">현재 LOG 전체 Firebase 업로드</button>
+      <button class="btn rd sm" onclick="document.getElementById('lg-import').value=''">입력창 비우기</button>
+    </div>
+  </div>
+
   <div class="sec mb">LOG 히스토리</div>
   <div class="card mb">
     <div style="display:grid;grid-template-columns:100px 140px 115px 115px 90px 110px 50px;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);">
@@ -580,6 +614,61 @@ async function addLog(){
 }
 async function delLog(d){LOG=LOG.filter(l=>l.date!==d);localStorage.setItem('ttg_log4',JSON.stringify(LOG));renderLG();renderLogChart();}
 async function clearLog(){if(confirm('전체 삭제?')){LOG=[];localStorage.setItem('ttg_log4',JSON.stringify(LOG));renderLG();renderLogChart();}}
+
+
+function parseWon(v){
+  if(v===undefined||v===null)return null;
+  let s=String(v).trim();
+  if(!s)return null;
+  const neg=s.includes('-');
+  s=s.replace(/[₩,\s]/g,'').replace(/[^\d.]/g,'');
+  if(!s)return null;
+  const n=Number(s);
+  return Number.isFinite(n)?(neg?-n:n):null;
+}
+
+async function importExcelLog(){
+  const raw=document.getElementById('lg-import').value||'';
+  const lines=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  const parsed=[];
+  for(const line of lines){
+    const cells=line.split(/\t|,/).map(x=>x.trim());
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(cells[0]||''))continue;
+    const asset=parseWon(cells[1]);
+    const principal=parseWon(cells[3]!==undefined?cells[3]:cells[2]);
+    let added=parseWon(cells[4]);
+    if(asset===null||principal===null)continue;
+    parsed.push({date:cells[0],asset:Math.round(asset),principal:Math.round(principal),added:added===null?null:Math.round(added)});
+  }
+  if(!parsed.length)return toast('가져올 행이 없습니다. 날짜/총자산/누적원금 형식을 확인하세요',true);
+
+  parsed.sort((a,b)=>a.date.localeCompare(b.date));
+  for(let i=0;i<parsed.length;i++){
+    if(parsed[i].added===null){
+      const prev=LOG.filter(l=>l.date<parsed[i].date).sort((a,b)=>b.date.localeCompare(a.date))[0] || parsed[i-1];
+      parsed[i].added=prev?Math.max(0,parsed[i].principal-prev.principal):0;
+    }
+  }
+
+  parsed.forEach(entry=>{
+    LOG=LOG.filter(l=>l.date!==entry.date);
+    LOG.push(entry);
+  });
+  LOG.sort((a,b)=>a.date.localeCompare(b.date));
+  localStorage.setItem('ttg_log4',JSON.stringify(LOG));
+  renderLG();renderLogChart();renderOV();
+  toast(`${parsed.length}개 과거 LOG 반영 완료`);
+}
+
+async function uploadAllLog(){
+  if(!LOG.length)return toast('업로드할 LOG가 없습니다',true);
+  let okCnt=0;
+  for(const l of LOG){
+    const ok=await fbSave('log',l.date.replace(/-/g,''),l);
+    if(ok)okCnt++;
+  }
+  toast(okCnt===LOG.length?`LOG ${okCnt}개 Firebase 업로드 완료`:`${okCnt}/${LOG.length}개만 업로드됨`, okCnt!==LOG.length);
+}
 
 function renderLG(){
   const el=document.getElementById('lg-list');if(!el)return;el.innerHTML='';
