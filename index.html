@@ -455,35 +455,160 @@ async function fetchFX(updateScreen=true){
   }catch(e){return RT.fx;}
 }
 
-async function fetchPrice(sym){
+function parseMoney(v){
+  if(v===null||v===undefined)return null;
+  if(typeof v==='number')return Number.isFinite(v)?v:null;
+  const s=String(v).replace(/[^\d.-]/g,'');
+  if(!s)return null;
+  const n=Number(s);
+  return Number.isFinite(n)?n:null;
+}
+function lastFinite(arr){
+  if(!Array.isArray(arr))return null;
+  for(let i=arr.length-1;i>=0;i--){
+    const n=Number(arr[i]);
+    if(Number.isFinite(n)&&n>0)return n;
+  }
+  return null;
+}
+async function fetchTextNoCache(url){
+  const u=url+(url.includes('?')?'&':'?')+'_ts='+Date.now();
+  const urls=[
+    u,
+    'https://api.allorigins.win/raw?url='+encodeURIComponent(u)+'&_ts='+Date.now(),
+    'https://corsproxy.io/?'+encodeURIComponent(u)
+  ];
+  for(const x of urls){
+    try{
+      const r=await fetch(x,{cache:'no-store'});
+      if(r.ok)return await r.text();
+    }catch(e){}
+  }
+  return null;
+}
+async function fetchJsonNoCache(url){
+  const txt=await fetchTextNoCache(url);
+  if(!txt)return null;
+  try{return JSON.parse(txt);}catch(e){return null;}
+}
+function yahooCandidates(sym){
+  if(/^\d{6}\.(KS|KQ)$/i.test(sym)){
+    const code=sym.slice(0,6);
+    return [`${code}.KS`,`${code}.KQ`];
+  }
+  return [sym];
+}
+async function fetchNaverPrice(code){
   try{
-    const url=`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d`;
-    const r=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
-    const data=await r.json();
-    return data.chart.result[0].meta.regularMarketPrice;
-  }catch(e){return null;}
+    const data=await fetchJsonNoCache(`https://api.stock.naver.com/stock/${code}/basic`);
+    const p=parseMoney(data?.closePrice||data?.nowVal||data?.lastPrice);
+    if(p&&p>0)return {price:p,source:'Naver',symbol:code};
+  }catch(e){}
+  return null;
+}
+function pickYahooPrice(result){
+  if(!result)return null;
+  const meta=result.meta||{};
+  const q=result.indicators?.quote?.[0]||{};
+  const latestCandle=lastFinite(q.close);
+  const state=String(meta.marketState||'').toUpperCase();
+  const candidates=[];
+  if(state.includes('PRE'))candidates.push(meta.preMarketPrice);
+  if(state.includes('POST'))candidates.push(meta.postMarketPrice);
+  candidates.push(meta.regularMarketPrice,latestCandle,meta.postMarketPrice,meta.preMarketPrice,meta.previousClose);
+  for(const x of candidates){
+    const n=Number(x);
+    if(Number.isFinite(n)&&n>0)return n;
+  }
+  return null;
+}
+async function fetchYahooPrice(sym){
+  for(const s of yahooCandidates(sym)){
+    try{
+      const url=`https://query1.finance.yahoo.com/v8/finance/chart/${s}?interval=1m&range=1d&includePrePost=true`;
+      const data=await fetchJsonNoCache(url);
+      const result=data?.chart?.result?.[0];
+      const p=pickYahooPrice(result);
+      if(p&&p>0)return {price:p,source:'Yahoo',symbol:s};
+    }catch(e){}
+  }
+  return null;
+}
+async function fetchStooqPrice(sym){
+  if(/\./.test(sym)||/^\d/.test(sym))return null;
+  try{
+    const txt=await fetchTextNoCache(`https://stooq.com/q/l/?s=${sym.toLowerCase()}.us&f=sd2t2ohlcv&h&e=csv`);
+    if(!txt)return null;
+    const lines=txt.trim().split(/\r?\n/);
+    if(lines.length<2)return null;
+    const cols=lines[1].split(',');
+    const close=parseMoney(cols[6]||cols[4]);
+    if(close&&close>0)return {price:close,source:'Stooq',symbol:sym};
+  }catch(e){}
+  return null;
+}
+async function fetchPrice(sym){
+  if(/^\d{6}\.(KS|KQ)$/i.test(sym)){
+    const n=await fetchNaverPrice(sym.slice(0,6));
+    if(n)return n;
+  }
+  const y=await fetchYahooPrice(sym);
+  if(y)return y;
+  const s=await fetchStooqPrice(sym);
+  if(s)return s;
+  return null;
 }
 
 async function refreshPrices(silent=false){
   const spin=document.getElementById('rspin');
   if(spin)spin.style.display='inline-block';
+
+  const before=grand(RT.fx||1504.77);
   const fx=await fetchFX(false);
-  const usSym=[...new Set(H.filter(h=>h.sym).map(h=>h.sym))];
-  const krSym=[...new Set(H.filter(h=>h.krx).map(h=>h.krx))];
-  const pm={};
-  await Promise.all([
-    ...usSym.map(async s=>{const p=await fetchPrice(s);if(p)pm[s]=p;}),
-    ...krSym.map(async s=>{const p=await fetchPrice(s);if(p)pm[s]=p;}),
-  ]);
-  H.forEach(h=>{const k=h.sym||h.krx;if(k&&pm[k])h.p=pm[k];});
+  const keys=[...new Set(H.map(h=>h.sym||h.krx).filter(Boolean))];
+
+  const pm={}, src={}, failed=[];
+  await Promise.all(keys.map(async k=>{
+    const res=await fetchPrice(k);
+    if(res&&res.price){
+      pm[k]=res.price;
+      src[k]=res.source+(res.symbol&&res.symbol!==k?`:${res.symbol}`:'');
+    }else{
+      failed.push(k);
+    }
+  }));
+
+  let changed=0, updated=0;
+  H.forEach(h=>{
+    const k=h.sym||h.krx;
+    if(k&&pm[k]){
+      updated++;
+      if(Math.abs(Number(h.p)-Number(pm[k]))>0.000001)changed++;
+      h.p=Number(pm[k]);
+      h.src=src[k]||'API';
+    }
+  });
+
+  const after=grand(fx);
   const now=new Date().toLocaleTimeString('ko-KR');
-  const lu=document.getElementById('lu');if(lu)lu.textContent=now+' 자동 업데이트';
-  const rtLast=document.getElementById('rt-last');if(rtLast)rtLast.textContent=now;
+  const status=`${now} 시세 ${Object.keys(pm).length}/${keys.length}종 수신 · 변동 ${changed}개 · 총액 ${fmtM(after-before)}`;
+  const lu=document.getElementById('lu');if(lu)lu.textContent=status;
+  const rtLast=document.getElementById('rt-last');if(rtLast)rtLast.textContent=status;
   if(spin)spin.style.display='none';
+
   localStorage.setItem('ttg_h3',JSON.stringify(H));
   localStorage.setItem('ttg_rt3',JSON.stringify(RT));
   renderAll();
-  if(!silent)toast('시세 업데이트 완료 (15분 지연)');
+
+  if(!silent){
+    if(Object.keys(pm).length===0){
+      toast('시세 API 응답 0개: 회사망/브라우저/CORS 프록시 차단 가능성이 큽니다',true);
+    }else if(changed===0){
+      toast(`시세는 수신됨. 가격 변동 없음 (${Object.keys(pm).length}/${keys.length}종)`);
+    }else{
+      toast(`시세 업데이트 완료: ${Object.keys(pm).length}/${keys.length}종, 가격변동 ${changed}개`);
+    }
+  }
 }
 
 async function fbSave(col,id,data){
