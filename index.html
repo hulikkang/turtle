@@ -153,7 +153,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 V1.4</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v1.6</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -346,16 +346,15 @@ input[type=number]{text-align:left;}
 <div class="pg" id="pg-dy">
   <div class="sec mb">종목 추가 / 삭제</div>
   <div class="card mb">
-    <div style="display:grid;grid-template-columns:120px 160px 1fr 90px 95px 90px auto;gap:8px;align-items:end;">
-      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">계좌구분</div><select id="asset-type" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:6px 8px;border-radius:5px;font-size:13px;"><option value="d">직투</option><option value="i">ISA</option><option value="r">RSA</option><option value="p">IRP/DC</option></select></div>
-      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">계좌명</div><input type="text" id="asset-account" placeholder="예: KB ISA" style="width:100%;"></div>
+    <div style="display:grid;grid-template-columns:220px 1fr 90px 95px 90px auto;gap:8px;align-items:end;">
+      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">계좌 선택</div><select id="asset-account-select" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:6px 8px;border-radius:5px;font-size:13px;"></select></div>
       <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">티커/종목코드</div><input type="text" id="asset-query" placeholder="QQQM 또는 379810" style="width:100%;" onkeydown="if(event.key==='Enter')searchAsset();"></div>
       <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">구분</div><select id="asset-bucket" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:6px 8px;border-radius:5px;font-size:13px;"><option value="QQQM">QQQM</option><option value="QLD">QLD</option><option value="SPYM">SPYM</option><option value="SGOV">SGOV</option></select></div>
       <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">수량</div><input type="number" id="asset-qty" step="0.0001" placeholder="0" style="width:100%;"></div>
       <button class="btn sm" onclick="searchAsset()">검색</button>
       <button class="btn sm" onclick="addAssetFromForm()">+ 추가</button>
     </div>
-    <div class="lu" id="asset-search-result" style="margin-top:10px;">티커를 검색하면 가격/통화가 확인됩니다. 한국 6자리 종목코드는 자동으로 .KS를 붙입니다.</div>
+    <div class="lu" id="asset-search-result" style="margin-top:10px;">기존 계좌 중 하나를 선택하고 티커를 검색하세요. 한국 6자리 종목코드는 자동으로 .KS를 붙입니다.</div>
   </div>
   <div class="sec mb">수량 입력</div>
   <div style="display:flex;gap:8px;margin-bottom:14px;">
@@ -686,7 +685,16 @@ function lastFinite(arr){
   }
   return null;
 }
-async function fetchTextNoCache(url){
+async function fetchWithTimeout(url,opts={},timeout=3200){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeout);
+  try{
+    return await fetch(url,{...opts,signal:controller.signal});
+  }finally{
+    clearTimeout(timer);
+  }
+}
+async function fetchTextNoCache(url,timeout=3200){
   const u=url+(url.includes('?')?'&':'?')+'_ts='+Date.now();
   const urls=[
     u,
@@ -695,16 +703,30 @@ async function fetchTextNoCache(url){
   ];
   for(const x of urls){
     try{
-      const r=await fetch(x,{cache:'no-store'});
+      const r=await fetchWithTimeout(x,{cache:'no-store'},timeout);
       if(r.ok)return await r.text();
     }catch(e){}
   }
   return null;
 }
-async function fetchJsonNoCache(url){
-  const txt=await fetchTextNoCache(url);
+async function fetchJsonNoCache(url,timeout=3200){
+  const txt=await fetchTextNoCache(url,timeout);
   if(!txt)return null;
   try{return JSON.parse(txt);}catch(e){return null;}
+}
+async function firstSuccessful(tasks){
+  if(!tasks.length)return null;
+  return await new Promise(resolve=>{
+    let done=false,left=tasks.length;
+    tasks.forEach(fn=>{
+      Promise.resolve().then(fn).then(res=>{
+        if(!done&&res&&res.price){done=true;resolve(res);}
+      }).catch(()=>{}).finally(()=>{
+        left--;
+        if(left===0&&!done)resolve(null);
+      });
+    });
+  });
 }
 function yahooCandidates(sym){
   if(/^\d{6}\.(KS|KQ)$/i.test(sym)){
@@ -764,14 +786,16 @@ async function fetchStooqPrice(sym){
 }
 async function fetchPrice(sym){
   if(/^\d{6}\.(KS|KQ)$/i.test(sym)){
-    const n=await fetchNaverPrice(sym.slice(0,6));
-    if(n)return n;
+    const code=sym.slice(0,6);
+    return await firstSuccessful([
+      ()=>fetchNaverPrice(code),
+      ()=>fetchYahooPrice(sym)
+    ]);
   }
-  const y=await fetchYahooPrice(sym);
-  if(y)return y;
-  const s=await fetchStooqPrice(sym);
-  if(s)return s;
-  return null;
+  return await firstSuccessful([
+    ()=>fetchStooqPrice(sym),
+    ()=>fetchYahooPrice(sym)
+  ]);
 }
 
 async function refreshPrices(silent=false){
@@ -1236,6 +1260,49 @@ function renderSCChart(){
 }
 
 
+let ACCOUNT_CACHE=[];
+function acctTypeLabel(t){return t==='i'?'ISA':t==='r'?'RSA':t==='p'?'IRP/DC':'직투';}
+function getUniqueAccounts(){
+  const map=new Map();
+  H.forEach(h=>{
+    if(!h||!h.a)return;
+    const key=(h.t||'d')+'|'+h.a;
+    if(!map.has(key))map.set(key,{t:h.t||'d',a:h.a});
+  });
+  return [...map.values()].sort((x,y)=>{
+    const order={d:0,i:1,r:2,p:3};
+    return (order[x.t]??9)-(order[y.t]??9)||String(x.a).localeCompare(String(y.a),'ko');
+  });
+}
+function syncAccountSelect(){
+  const sel=document.getElementById('asset-account-select');
+  if(!sel)return;
+  const prev=sel.dataset.selectedText||sel.options[sel.selectedIndex]?.textContent||'';
+  ACCOUNT_CACHE=getUniqueAccounts();
+  sel.innerHTML='';
+  ACCOUNT_CACHE.forEach((acc,i)=>{
+    const opt=document.createElement('option');
+    opt.value=String(i);
+    opt.textContent=`${acc.a}`;
+    opt.title=acctTypeLabel(acc.t);
+    sel.appendChild(opt);
+  });
+  if(!ACCOUNT_CACHE.length){
+    const opt=document.createElement('option');
+    opt.value='';opt.textContent='등록된 계좌 없음';sel.appendChild(opt);
+  }else{
+    const found=[...sel.options].find(o=>o.textContent===prev);
+    if(found)sel.value=found.value;
+  }
+}
+function selectedAssetAccount(){
+  const sel=document.getElementById('asset-account-select');
+  if(!sel)return null;
+  const acc=ACCOUNT_CACHE[Number(sel.value)];
+  if(sel.options[sel.selectedIndex])sel.dataset.selectedText=sel.options[sel.selectedIndex].textContent;
+  return acc||null;
+}
+
 function normAssetQuery(q){
   let s=String(q||'').trim();
   if(!s)return null;
@@ -1266,30 +1333,33 @@ async function searchAsset(){
 async function addAssetFromForm(){
   if(!ASSET_SEARCH){await searchAsset();}
   if(!ASSET_SEARCH)return;
-  const type=document.getElementById('asset-type')?.value||'d';
-  const account=(document.getElementById('asset-account')?.value||'미지정').trim();
+  syncAccountSelect();
+  const acc=selectedAssetAccount();
+  if(!acc)return toast('계좌를 선택하세요',true);
+  const type=acc.t;
+  const account=acc.a;
   const bucket=(document.getElementById('asset-bucket')?.value||'QQQM').toUpperCase();
   const qty=Number(document.getElementById('asset-qty')?.value||0);
-  if(!account)return toast('계좌명을 입력하세요',true);
   if(!Number.isFinite(qty)||qty<=0)return toast('수량을 0보다 크게 입력하세요',true);
   H.push({t:type,a:account,e:ASSET_SEARCH.name||ASSET_SEARCH.query,tk:bucket,cl:bucketClass(bucket),sym:ASSET_SEARCH.symbol,krx:ASSET_SEARCH.krx,p:ASSET_SEARCH.price,q:qty,c:ASSET_SEARCH.currency,r:''});
   localStorage.setItem('ttg_h3',JSON.stringify(H));
   ASSET_SEARCH=null;
-  const out=document.getElementById('asset-search-result');if(out)out.textContent='종목 추가 완료. Firebase 저장 버튼을 눌러 확정하세요.';
+  const out=document.getElementById('asset-search-result');if(out)out.textContent=`종목 추가 완료: ${account}. Firebase 저장 버튼을 눌러 확정하세요.`;
   const qe=document.getElementById('asset-query');if(qe)qe.value='';
   const qtyEl=document.getElementById('asset-qty');if(qtyEl)qtyEl.value='';
-  renderDY();renderOV();renderRT();
+  renderDY();renderOV();renderRT();syncAccountSelect();
   toast('종목 추가 완료: Firebase 저장 필요');
 }
 function deleteAsset(i){
   const h=H[i];if(!h)return;
   if(!confirm(`${h.a} / ${h.e} 항목을 삭제할까요?`))return;
   H.splice(i,1);localStorage.setItem('ttg_h3',JSON.stringify(H));
-  renderDY();renderOV();renderRT();
+  renderDY();renderOV();renderRT();syncAccountSelect();
   toast('종목 삭제 완료: Firebase 저장 필요');
 }
 
 function renderDY(){
+  syncAccountSelect();
   const fx=RT.fx||1504.77;
   const tb=document.getElementById('dy-tbody');if(!tb)return;tb.innerHTML='';
   let tot2=0;
