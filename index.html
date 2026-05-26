@@ -5,27 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>거북투자종합회사</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-  // =============================================
-  // !! 아래 YOUR_CONFIG 를 Firebase 콘솔에서 복사한 값으로 교체하세요 !!
-  // =============================================
+  import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   const firebaseConfig = {
     apiKey: "AIzaSyC-j6-RqOLj-qf8foM-9_dRsSNvLZ9OpB4",
     authDomain: "turtleinvestmentcompany.firebaseapp.com",
     projectId: "turtleinvestmentcompany",
     storageBucket: "turtleinvestmentcompany.firebasestorage.app",
     messagingSenderId: "225995629429",
-    appId: "1:225995629429:web:fd224b86ee9da112d2e93c"
+    appId: "1:225995629429:web:fd224b86ee9da112d2e93c",
+    measurementId: "G-3J8DG35RHV"
   };
-
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   window._db = db;
-  window._firestore = { doc, setDoc, getDoc, collection, addDoc, getDocs, orderBy, query };
+  window._fs = { doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, orderBy, query };
   window._fbReady = true;
   window.dispatchEvent(new Event('fbready'));
 </script>
@@ -37,18 +32,19 @@
   --ac:#00d4aa;--bl:#3b82f6;--am:#f59e0b;--rd:#ef4444;--gn:#10b981;
   --t1:#e6edf3;--t2:#8b949e;--t3:#484f58;
 }
-html,body{height:100%;background:var(--bg);color:var(--t1);font-family:system-ui,-apple-system,sans-serif;font-size:14px;}
-.nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100;}
-.logo{font-size:14px;font-weight:800;color:var(--ac);letter-spacing:1px;}
-.logo-s{font-size:10px;color:var(--t3);}
-.tabs{display:flex;height:100%;gap:0;overflow-x:auto;}
-.tab{padding:0 14px;height:100%;display:flex;align-items:center;font-size:12px;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
+html,body{background:var(--bg);color:var(--t1);font-family:system-ui,-apple-system,sans-serif;font-size:15px;}
+.nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:100;}
+.logo{font-size:15px;font-weight:800;color:var(--ac);letter-spacing:1px;}
+.logo-s{font-size:11px;color:var(--t3);}
+.tabs{display:flex;height:100%;overflow-x:auto;}
+.tab{padding:0 16px;height:100%;display:flex;align-items:center;font-size:13px;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
 .tab:hover{color:var(--t1);}
 .tab.on{color:var(--ac);border-bottom-color:var(--ac);}
 .nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.badge{font-size:10px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.25);color:var(--ac);padding:2px 8px;border-radius:20px;white-space:nowrap;}
-.sync-dot{width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0;}
+.badge{font-size:11px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.25);color:var(--ac);padding:3px 10px;border-radius:20px;white-space:nowrap;}
+.sync-dot{width:9px;height:9px;border-radius:50%;background:#ef4444;flex-shrink:0;}
 .sync-dot.ok{background:#10b981;}
+.lu{font-size:11px;color:var(--t3);font-family:monospace;}
 .pg{display:none;padding:16px;max-width:1400px;margin:0 auto;}
 .pg.on{display:block;}
 .g5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;}
@@ -59,109 +55,90 @@ html,body{height:100%;background:var(--bg);color:var(--t1);font-family:system-ui
   .g5{grid-template-columns:repeat(2,1fr);}
   .g3{grid-template-columns:1fr 1fr;}
   .g2,.g21{grid-template-columns:1fr;}
-  .nav-right .badge{display:none;}
 }
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;}
 .card.hi{border-color:rgba(0,212,170,0.25);}
-.ct{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
-.mv{font-size:22px;font-weight:700;font-family:monospace;line-height:1.1;}
-.mv.ac{color:var(--ac);}
-.mv.gn{color:var(--gn);}
-.mv.rd{color:var(--rd);}
-.mv.sm{font-size:16px;}
-.ms{font-size:11px;color:var(--t2);margin-top:2px;}
-.mc{font-size:11px;margin-top:4px;font-family:monospace;}
-.sec{font-size:11px;font-weight:700;color:var(--t2);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;}
-.sec::before{content:'';display:block;width:3px;height:12px;background:var(--ac);border-radius:1px;}
+.ct{font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.mv{font-size:24px;font-weight:700;font-family:monospace;line-height:1.1;}
+.mv.ac{color:var(--ac);}.mv.gn{color:var(--gn);}.mv.rd{color:var(--rd);}.mv.sm{font-size:18px;}
+.ms{font-size:12px;color:var(--t2);margin-top:3px;}
+.mc{font-size:12px;margin-top:4px;font-family:monospace;}
+.sec{font-size:12px;font-weight:700;color:var(--t2);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;}
+.sec::before{content:'';display:block;width:3px;height:13px;background:var(--ac);border-radius:1px;}
 .mb{margin-bottom:14px;}
-table{width:100%;border-collapse:collapse;font-size:11px;}
-th{text-align:left;padding:6px 8px;color:var(--t3);font-size:9px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);font-weight:500;}
-td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--t2);font-family:monospace;font-size:11px;}
-td.nm{font-family:system-ui,sans-serif;color:var(--t1);font-size:11px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;padding:7px 8px;color:var(--t3);font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);font-weight:500;}
+td{padding:8px 8px;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--t2);font-family:monospace;font-size:12px;}
+td.nm{font-family:system-ui,sans-serif;color:var(--t1);font-size:13px;}
 td.ac{color:var(--ac);}td.gn{color:var(--gn);}
 tr:hover td{background:rgba(255,255,255,0.02);}
 tfoot td{border-top:1px solid var(--border);font-weight:700;color:var(--t1);}
-.tk{display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;font-family:monospace;font-weight:700;}
+.tk{display:inline-block;font-size:10px;padding:2px 6px;border-radius:3px;font-family:monospace;font-weight:700;}
 .tk.qm{background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.2);color:#00d4aa;}
 .tk.ql{background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);color:#60a5fa;}
 .tk.sp{background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);color:#fbbf24;}
 .tk.sg{background:rgba(100,116,139,0.15);border:1px solid rgba(100,116,139,0.2);color:#94a3b8;}
-.pb-wrap{margin-bottom:8px;}
-.pb-lbl{display:flex;justify-content:space-between;margin-bottom:2px;font-size:10px;color:var(--t2);}
-.pb{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;}
+.pb-wrap{margin-bottom:9px;}
+.pb-lbl{display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;color:var(--t2);}
+.pb{height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;}
 .pf{height:100%;border-radius:2px;}
-input[type=number],input[type=text],input[type=date],select{background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:5px 8px;border-radius:5px;font-family:monospace;font-size:11px;outline:none;transition:border .2s;}
-input:focus,select:focus{border-color:var(--ac);}
-input[type=number]{text-align:right;}
-.btn{background:rgba(0,212,170,0.08);border:1px solid rgba(0,212,170,0.25);color:var(--ac);padding:6px 14px;border-radius:5px;cursor:pointer;font-size:11px;transition:all .2s;white-space:nowrap;}
+input[type=number],input[type=text],input[type=date]{background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:6px 8px;border-radius:5px;font-family:monospace;font-size:13px;outline:none;transition:border .2s;-moz-appearance:textfield;}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{opacity:1;}
+input:focus{border-color:var(--ac);}
+input[type=number]{text-align:left;}
+.btn{background:rgba(0,212,170,0.08);border:1px solid rgba(0,212,170,0.25);color:var(--ac);padding:7px 16px;border-radius:5px;cursor:pointer;font-size:13px;transition:all .2s;white-space:nowrap;}
 .btn:hover{background:rgba(0,212,170,0.18);}
 .btn.rd{background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.25);color:var(--rd);}
 .btn.rd:hover{background:rgba(239,68,68,0.18);}
-.btn.sm{padding:3px 8px;font-size:10px;}
 .btn.am{background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.25);color:var(--am);}
-.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(0,212,170,0.3);border-top-color:var(--ac);border-radius:50%;animation:spin .7s linear infinite;}
+.btn.sm{padding:4px 10px;font-size:11px;}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(0,212,170,0.3);border-top-color:var(--ac);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;}
 @keyframes spin{to{transform:rotate(360deg);}}
-.price-cell{position:relative;}
-.price-stale{color:var(--t3)!important;}
 .toast-wrap{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;}
-.toast{background:var(--bg3);border:1px solid var(--ac);color:var(--ac);padding:8px 16px;border-radius:6px;font-size:12px;animation:fadeUp .3s ease;}
+.toast{background:var(--bg3);border:1px solid var(--ac);color:var(--ac);padding:9px 18px;border-radius:6px;font-size:13px;animation:fadeUp .3s ease;}
 .toast.err{border-color:var(--rd);color:var(--rd);}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
-.last-update{font-size:10px;color:var(--t3);font-family:monospace;}
-.setup-banner{background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:16px;margin-bottom:16px;font-size:12px;color:var(--am);line-height:1.8;}
-.setup-banner code{background:var(--bg3);padding:1px 6px;border-radius:3px;font-family:monospace;color:var(--t1);}
 </style>
 </head>
 <body>
-
 <nav class="nav">
-  <div>
-    <div class="logo">거북투자종합회사</div>
-    <div class="logo-s">대 영 아르케 칸 · 므두셀라 가문</div>
-  </div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">대 영 아르케 칸 · 므두셀라 가문</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
-    <div class="tab" onclick="sp('hd')">보유종목</div>
     <div class="tab" onclick="sp('lg')">자산LOG</div>
     <div class="tab" onclick="sp('sc')">시나리오</div>
-    <div class="tab" onclick="sp('cfg')">설정</div>
+    <div class="tab" onclick="sp('dy')">일일변동</div>
   </div>
   <div class="nav-right">
-    <div class="sync-dot" id="sync-dot" title="Firebase 연결 상태"></div>
-    <div class="last-update" id="last-update">시세 로딩중...</div>
+    <div class="sync-dot" id="sync-dot"></div>
+    <div class="lu" id="lu">시세 로딩중...</div>
     <div class="badge">2045 · 100억</div>
   </div>
 </nav>
-
-<div class="toast-wrap" id="toast-wrap"></div>
+<div class="toast-wrap" id="tw"></div>
 
 <!-- OVERVIEW -->
 <div class="pg on" id="pg-ov">
-  <div id="setup-banner" class="setup-banner" style="display:none;">
-    <strong>Firebase 설정 필요</strong><br>
-    <code>index.html</code> 상단의 <code>firebaseConfig</code> 값을 Firebase 콘솔에서 복사한 값으로 교체하세요.<br>
-    자세한 방법은 <strong>설정</strong> 탭을 참조하세요.
-  </div>
   <div class="g5">
-    <div class="card hi"><div class="ct">총 자산</div><div class="mv ac" id="ov-tot">-</div><div class="ms" id="ov-totr">로딩중...</div><div class="mc" id="ov-chg">-</div></div>
+    <div class="card hi"><div class="ct">총 자산</div><div class="mv ac" id="ov-tot">-</div><div class="ms" id="ov-totr">-</div><div class="mc" id="ov-chg">-</div></div>
     <div class="card"><div class="ct">투입 원금</div><div class="mv" id="ov-pri">-</div><div class="ms">누적 투입</div></div>
     <div class="card"><div class="ct">수익금</div><div class="mv gn" id="ov-prf">-</div><div class="ms" id="ov-rt">-</div></div>
-    <div class="card"><div class="ct">USD/KRW</div><div class="mv sm" id="ov-fx"><span class="spinner"></span></div><div class="ms" id="ov-fx-t">실시간 환율</div></div>
+    <div class="card"><div class="ct">USD/KRW</div><div class="mv sm" id="ov-fx"><span class="spinner"></span></div><div class="ms">실시간 자동</div></div>
     <div class="card"><div class="ct">ATH</div><div class="mv sm" style="color:var(--am);">6.44억</div><div class="ms">643,675,581 · 26.05.22</div></div>
   </div>
   <div class="g21">
     <div class="card">
       <div class="ct">목표 달성률</div>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-        <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;transform:rotate(-90deg)">
-          <circle cx="35" cy="35" r="28" fill="none" stroke="#21262d" stroke-width="6"/>
-          <circle cx="35" cy="35" r="28" fill="none" stroke="#00d4aa" stroke-width="6" stroke-dasharray="175.9" id="g-arc" stroke-dashoffset="164.6" stroke-linecap="round"/>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+        <svg width="76" height="76" viewBox="0 0 76 76" style="flex-shrink:0;transform:rotate(-90deg)">
+          <circle cx="38" cy="38" r="30" fill="none" stroke="#21262d" stroke-width="7"/>
+          <circle cx="38" cy="38" r="30" fill="none" stroke="#00d4aa" stroke-width="7" stroke-dasharray="188.5" id="g-arc" stroke-dashoffset="176.4" stroke-linecap="round"/>
         </svg>
         <div>
-          <div style="font-family:monospace;font-size:18px;font-weight:700;color:var(--ac);" id="g-pct">-</div>
-          <div style="font-size:10px;color:var(--t3);">100억 목표</div>
-          <div style="font-size:11px;color:var(--t2);margin-top:4px;" id="g-rem">-</div>
+          <div style="font-family:monospace;font-size:20px;font-weight:700;color:var(--ac);" id="g-pct">-</div>
+          <div style="font-size:11px;color:var(--t3);">100억 목표</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:4px;" id="g-rem">-</div>
         </div>
       </div>
       <div class="pb-wrap"><div class="pb-lbl"><span>직투</span><span id="pp-d">-</span></div><div class="pb"><div class="pf" id="pf-d" style="background:#3b82f6;width:0%"></div></div></div>
@@ -169,11 +146,34 @@ input[type=number]{text-align:right;}
       <div class="pb-wrap"><div class="pb-lbl"><span>ISA</span><span id="pp-i">-</span></div><div class="pb"><div class="pf" id="pf-i" style="background:#00d4aa;width:0%"></div></div></div>
       <div class="pb-wrap"><div class="pb-lbl"><span>RSA</span><span id="pp-r">-</span></div><div class="pb"><div class="pf" id="pf-r" style="background:#a855f7;width:0%"></div></div></div>
     </div>
-    <div class="card"><div class="ct">총 자산 추이 (LOG 기반)</div><div style="position:relative;height:200px;"><canvas id="c-trend" role="img" aria-label="자산추이">자산추이</canvas></div></div>
+    <div class="card"><div class="ct">총 자산 추이</div><div style="position:relative;height:210px;"><canvas id="c-trend" role="img" aria-label="자산추이">자산추이</canvas></div></div>
   </div>
   <div class="g2">
-    <div class="card"><div class="ct">전략 배분</div><div style="position:relative;height:150px;"><canvas id="c-strat" role="img" aria-label="전략배분">전략배분</canvas></div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;" id="strat-leg"></div></div>
-    <div class="card"><div class="ct">계좌별 규모</div><div style="position:relative;height:200px;"><canvas id="c-acct" role="img" aria-label="계좌별">계좌별</canvas></div></div>
+    <div class="card"><div class="ct">전략 배분</div><div style="position:relative;height:160px;"><canvas id="c-strat" role="img" aria-label="전략배분">전략배분</canvas></div><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;" id="strat-leg"></div></div>
+    <div class="card"><div class="ct">계좌별 규모</div><div style="position:relative;height:210px;"><canvas id="c-acct" role="img" aria-label="계좌별">계좌별</canvas></div></div>
+  </div>
+
+  <!-- 보유종목 인라인 -->
+  <div class="sec mb">직투 계좌</div>
+  <div class="card mb">
+    <table><thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
+    <tbody id="ov-direct"></tbody>
+    <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="ov-ds">-</td><td class="gn" id="ov-dp">-</td></tr></tfoot>
+    </table>
+  </div>
+  <div class="sec mb">ISA 계좌</div>
+  <div class="card mb">
+    <table><thead><tr><th>계좌</th><th>ETF명 (코드)</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>역할</th></tr></thead>
+    <tbody id="ov-isa"></tbody>
+    <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="ov-is">-</td><td style="color:var(--ac);font-size:11px;" id="ov-ip">-</td></tr></tfoot>
+    </table>
+  </div>
+  <div class="sec mb">RSA / IRP·DC</div>
+  <div class="card">
+    <table><thead><tr><th>계좌</th><th>ETF명 (코드)</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>역할</th></tr></thead>
+    <tbody id="ov-pen"></tbody>
+    <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="ov-ps">-</td><td style="color:var(--am);font-size:11px;" id="ov-pp">-</td></tr></tfoot>
+    </table>
   </div>
 </div>
 
@@ -183,16 +183,14 @@ input[type=number]{text-align:right;}
     <div class="card hi"><div class="ct">실시간 총 자산</div><div class="mv ac" id="rt-tot">-</div><div class="ms" id="rt-totr">-</div></div>
     <div class="card"><div class="ct">전일 대비</div><div class="mv" id="rt-chg">-</div><div class="ms" id="rt-chgp">-</div></div>
     <div class="card"><div class="ct">수익금</div><div class="mv gn" id="rt-prf">-</div><div class="ms" id="rt-rtp">-</div></div>
-    <div class="card"><div class="ct">USD/KRW (자동)</div><div class="mv sm" id="rt-fx"><span class="spinner"></span></div><div class="ms" id="rt-fx-t">exchangerate-api</div></div>
+    <div class="card"><div class="ct">USD/KRW (자동)</div><div class="mv sm" id="rt-fx"><span class="spinner"></span></div><div class="ms">exchangerate-api</div></div>
     <div class="card"><div class="ct">ATH 대비</div><div class="mv sm" id="rt-ath">-</div><div class="ms">643,675,581</div></div>
   </div>
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
-    <span style="font-size:11px;color:var(--t2);">투입원금</span>
-    <input type="number" id="rt-pri" value="524313920" style="width:140px;" oninput="calcRT()">
-    <button class="btn" onclick="refreshPrices()"><span class="spinner" id="refresh-spin" style="display:none;"></span> 시세 새로고침</button>
-    <button class="btn" onclick="saveRT()">Firebase 저장</button>
-    <button class="btn am" onclick="saveLogNow()">LOG 기록 저장</button>
-    <span class="last-update" id="rt-last">-</span>
+    <button class="btn" onclick="refreshPrices()"><span class="spinner" id="rspin" style="display:none;"></span> 시세 새로고침</button>
+    <button class="btn am" onclick="saveLogNow()">오늘 LOG 저장</button>
+    <div style="font-size:12px;color:var(--t3);">수량 변경은 [일일변동] 탭에서</div>
+    <span class="lu" id="rt-last">-</span>
   </div>
   <div class="card">
     <table>
@@ -203,112 +201,79 @@ input[type=number]{text-align:right;}
   </div>
 </div>
 
-<!-- HOLDINGS -->
-<div class="pg" id="pg-hd">
-  <div class="sec mb">직투 계좌</div>
-  <div class="card mb">
-    <table><thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
-    <tbody id="hd-direct"></tbody>
-    <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="hd-ds">-</td><td class="gn" id="hd-dp">-</td></tr></tfoot>
-    </table>
-  </div>
-  <div class="sec mb">ISA 계좌</div>
-  <div class="card mb">
-    <table><thead><tr><th>계좌</th><th>ETF명 (코드)</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>역할</th></tr></thead>
-    <tbody id="hd-isa"></tbody>
-    <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="hd-is">-</td><td style="color:var(--ac);font-size:10px;" id="hd-ip">-</td></tr></tfoot>
-    </table>
-  </div>
-  <div class="sec mb">RSA / IRP·DC</div>
-  <div class="card">
-    <table><thead><tr><th>계좌</th><th>ETF명 (코드)</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>역할</th></tr></thead>
-    <tbody id="hd-pen"></tbody>
-    <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="hd-ps">-</td><td style="color:var(--am);font-size:10px;" id="hd-pp">-</td></tr></tfoot>
-    </table>
-  </div>
-</div>
-
 <!-- LOG -->
 <div class="pg" id="pg-lg">
-  <div class="sec mb">자산 LOG</div>
+  <div class="sec mb">자산 LOG 입력</div>
   <div class="card mb">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">
-      <div><div style="font-size:10px;color:var(--t2);margin-bottom:3px;">날짜</div><input type="date" id="lg-d"></div>
-      <div><div style="font-size:10px;color:var(--t2);margin-bottom:3px;">총 자산 (자동계산)</div><input type="number" id="lg-a" placeholder="자동입력" style="width:140px;" readonly></div>
-      <div><div style="font-size:10px;color:var(--t2);margin-bottom:3px;">투입 원금</div><input type="number" id="lg-p" placeholder="524313920" style="width:140px;"></div>
-      <div><div style="font-size:10px;color:var(--t2);margin-bottom:3px;">추가 투입금 (당일)</div><input type="number" id="lg-add" placeholder="0" style="width:110px;"></div>
-      <button class="btn" onclick="addLog()">저장 (Firebase)</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">날짜</div><input type="date" id="lg-d"></div>
+      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">총 자산 (자동)</div><input type="number" id="lg-a" style="width:140px;" readonly placeholder="자동계산"></div>
+      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">투입 원금</div><input type="number" id="lg-p" style="width:140px;" placeholder="524313920"></div>
+      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">추가 투입금</div><input type="number" id="lg-add" style="width:110px;" placeholder="0"></div>
+      <button class="btn" onclick="addLog()">저장</button>
       <button class="btn rd sm" onclick="clearLog()">전체삭제</button>
     </div>
-    <div style="font-size:10px;color:var(--t3);">'저장' 누르면 현재 시세 기준 총자산이 자동으로 기록됩니다. 실시간 탭에서 시세를 먼저 새로고침하세요.</div>
   </div>
-  <div class="sec mb">LOG 히스토리 (Firebase)</div>
+  <div class="sec mb">LOG 히스토리</div>
   <div class="card mb">
-    <div style="display:grid;grid-template-columns:95px 130px 110px 110px 90px 100px 50px;gap:6px;padding:5px 8px;border-bottom:1px solid var(--border);">
-      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;">날짜</div>
-      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;">총 자산</div>
-      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;">전일대비</div>
-      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;">수익금</div>
-      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;">수익률</div>
-      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;">추가투입</div>
+    <div style="display:grid;grid-template-columns:100px 140px 115px 115px 90px 110px 50px;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);">
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">날짜</div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">총 자산</div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">전일대비</div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">수익금</div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">수익률</div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">추가투입</div>
       <div></div>
     </div>
     <div id="lg-list"></div>
   </div>
-  <div class="card"><div class="ct">자산 추이</div><div style="position:relative;height:220px;"><canvas id="c-log" role="img" aria-label="LOG추이">LOG</canvas></div></div>
+  <div class="card"><div class="ct">자산 추이</div><div style="position:relative;height:240px;"><canvas id="c-log" role="img" aria-label="LOG추이">LOG</canvas></div></div>
 </div>
 
 <!-- SCENARIO -->
 <div class="pg" id="pg-sc">
   <div class="sec mb">ISA 시나리오 (50세 은퇴)</div>
   <div class="card mb">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-      <span style="font-size:11px;color:var(--t2);">ISA현재</span><input type="number" id="sc-i" value="84171460" style="width:120px;">
-      <span style="font-size:11px;color:var(--t2);">월불입(만원)</span><input type="number" id="sc-m" value="200" style="width:70px;">
-      <span style="font-size:11px;color:var(--t2);">기간(년)</span><input type="number" id="sc-y" value="10" style="width:55px;">
-      <span style="font-size:11px;color:var(--t2);">배당률(%)</span><input type="number" id="sc-d" value="7" step="0.5" style="width:55px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+      <span style="font-size:13px;color:var(--t2);">ISA현재</span><input type="number" id="sc-i" value="84171460" style="width:130px;">
+      <span style="font-size:13px;color:var(--t2);">월불입(만원)</span><input type="number" id="sc-m" value="200" style="width:80px;">
+      <span style="font-size:13px;color:var(--t2);">기간(년)</span><input type="number" id="sc-y" value="10" style="width:65px;">
+      <span style="font-size:13px;color:var(--t2);">배당률(%)</span><input type="number" id="sc-d" value="7" step="0.5" style="width:65px;">
       <button class="btn" onclick="calcSC()">계산</button>
     </div>
-    <div style="display:grid;grid-template-columns:60px 130px 1fr 110px 110px 70px;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);">
-      <div style="font-size:9px;color:var(--t3);">수익률</div><div style="font-size:9px;color:var(--t3);">ISA 자산</div>
-      <div style="font-size:9px;color:var(--t3);">크기</div><div style="font-size:9px;color:var(--t3);">연간배당</div>
-      <div style="font-size:9px;color:var(--t3);">월배당</div><div style="font-size:9px;color:var(--t3);">배수</div>
+    <div style="display:grid;grid-template-columns:65px 140px 1fr 120px 120px 75px;gap:6px;padding:7px 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:10px;color:var(--t3);">수익률</div><div style="font-size:10px;color:var(--t3);">ISA 자산</div>
+      <div style="font-size:10px;color:var(--t3);">크기</div><div style="font-size:10px;color:var(--t3);">연간배당</div>
+      <div style="font-size:10px;color:var(--t3);">월배당</div><div style="font-size:10px;color:var(--t3);">배수</div>
     </div>
     <div id="sc-rows"></div>
   </div>
   <div class="sec mb">직투 성장 시나리오</div>
-  <div class="card"><div style="position:relative;height:240px;"><canvas id="c-sc" role="img" aria-label="직투성장">직투성장</canvas></div>
-    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;" id="sc-leg"></div>
+  <div class="card"><div style="position:relative;height:260px;"><canvas id="c-sc" role="img" aria-label="직투성장">직투성장</canvas></div>
+    <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;" id="sc-leg"></div>
   </div>
 </div>
 
-<!-- CONFIG -->
-<div class="pg" id="pg-cfg">
-  <div class="sec mb">Firebase 설정 가이드</div>
-  <div class="card mb" style="font-size:12px;line-height:2;color:var(--t2);">
-    <div style="color:var(--t1);font-weight:700;margin-bottom:8px;">Firebase 프로젝트 생성 및 연결 방법</div>
-    <div>1. <a href="https://console.firebase.google.com" target="_blank" style="color:var(--ac);">console.firebase.google.com</a> 접속 → 구글 계정 로그인</div>
-    <div>2. "프로젝트 만들기" → 이름 입력 (예: turtle-investment)</div>
-    <div>3. 프로젝트 생성 후 "웹 앱 추가" 클릭 (&#60;/&#62; 아이콘)</div>
-    <div>4. 앱 닉네임 입력 → "Firebase SDK 추가" 에서 <code style="background:var(--bg3);padding:1px 6px;border-radius:3px;">firebaseConfig</code> 복사</div>
-    <div>5. 이 파일(index.html) 상단 <code style="background:var(--bg3);padding:1px 6px;border-radius:3px;">YOUR_API_KEY</code> 등을 복사한 값으로 교체</div>
-    <div>6. Firestore Database → "데이터베이스 만들기" → 테스트 모드 선택</div>
-    <div>7. 파일을 저장하고 브라우저에서 열면 Firebase 자동 연결</div>
-    <div style="color:var(--am);margin-top:12px;">* GitHub Pages에 올리면 어디서든 접근 가능 (모바일 포함)</div>
-    <div style="color:var(--am);">* GitHub 계정 → New repository → index.html 업로드 → Settings → Pages → Branch: main → Save</div>
+<!-- 일일변동 -->
+<div class="pg" id="pg-dy">
+  <div class="sec mb">수량 변경 (일일변동)</div>
+  <div style="display:flex;gap:8px;margin-bottom:14px;">
+    <button class="btn" onclick="saveDY()">Firebase 저장</button>
+    <button class="btn rd sm" onclick="resetDY()">기본값 복원</button>
+    <div style="font-size:12px;color:var(--t3);align-self:center;">수량 변경 후 저장하면 실시간/개요에 즉시 반영됩니다</div>
   </div>
-  <div class="sec mb">수량 직접 수정</div>
   <div class="card">
     <table>
-      <thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>저장</th></tr></thead>
-      <tbody id="cfg-tbody"></tbody>
+      <thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th style="width:130px;">수량</th><th>현재가</th><th>평가액</th></tr></thead>
+      <tbody id="dy-tbody"></tbody>
+      <tfoot><tr><td colspan="5" class="nm">총계</td><td class="ac" id="dy-grand">-</td></tr></tfoot>
     </table>
   </div>
 </div>
 
 <script>
-const ATH = 643675581;
-const DEF_H = [
+const ATH=643675581;
+const DEF_H=[
   {t:'d',a:'메리츠',e:'iShares 0-3M Treasury (SGOV)',tk:'SGOV',cl:'sg',sym:'SGOV',krx:'',p:100.63,q:293,c:'USD',r:''},
   {t:'d',a:'메리츠',e:'SPDR S&P500 (SPYM)',tk:'SPYM',cl:'sp',sym:'SPYM',krx:'',p:87.75,q:218,c:'USD',r:''},
   {t:'d',a:'메리츠',e:'ProShares Ultra QQQ (QLD)',tk:'QLD',cl:'ql',sym:'QLD',krx:'',p:93.1,q:590,c:'USD',r:''},
@@ -333,320 +298,274 @@ const DEF_H = [
   {t:'p',a:'와이프 DC',e:'KODEX 머니마켓액티브 (488770)',tk:'SGOV',cl:'sg',sym:'',krx:'488770.KS',p:104450,q:135,c:'KRW',r:'실탄대기'},
 ];
 
-let H = JSON.parse(localStorage.getItem('ttg_h2')||'null') || JSON.parse(JSON.stringify(DEF_H));
-let LOG = [];
-let RT = JSON.parse(localStorage.getItem('ttg_rt2')||'null') || {fx:1504.77, pri:524313920};
-let pricesLoaded = false;
+const DEF_LOG=[
+  {date:'2025-12-08',asset:375117560,principal:358351283,added:0},
+  {date:'2025-12-09',asset:374303074,principal:358351283,added:0},
+  {date:'2025-12-12',asset:375393603,principal:358351283,added:0},
+  {date:'2025-12-15',asset:367685061,principal:358351283,added:0},
+  {date:'2025-12-16',asset:365986271,principal:358351283,added:0},
+  {date:'2025-12-17',asset:366155462,principal:358351283,added:0},
+  {date:'2025-12-19',asset:363903532,principal:358351283,added:0},
+  {date:'2025-12-22',asset:370076439,principal:358351283,added:0},
+  {date:'2025-12-24',asset:372690486,principal:358351283,added:0},
+  {date:'2025-12-26',asset:373744921,principal:358351283,added:0},
+  {date:'2025-12-29',asset:364839076,principal:358351283,added:0},
+  {date:'2025-12-30',asset:363117885,principal:358351283,added:0},
+  {date:'2025-12-31',asset:363706563,principal:358351283,added:0},
+  {date:'2026-01-05',asset:362354407,principal:358351283,added:0},
+  {date:'2026-01-07',asset:374511498,principal:358351283,added:0},
+  {date:'2026-01-08',asset:374944799,principal:358351283,added:0},
+  {date:'2026-01-09',asset:374436619,principal:358351283,added:0},
+  {date:'2026-01-13',asset:383981667,principal:362077686,added:3726403},
+  {date:'2026-01-14',asset:384951030,principal:362077686,added:0},
+  {date:'2026-01-15',asset:377782580,principal:362077686,added:0},
+  {date:'2026-01-16',asset:380985418,principal:362077686,added:0},
+  {date:'2026-01-19',asset:380295985,principal:362077686,added:0},
+  {date:'2026-01-21',asset:374898145,principal:367550707,added:5473021},
+  {date:'2026-01-30',asset:384257189,principal:367860707,added:310000},
+  {date:'2026-02-03',asset:382525819,principal:369260707,added:1400000},
+  {date:'2026-02-11',asset:375697924,principal:369360707,added:100000},
+  {date:'2026-02-13',asset:368960758,principal:372683509,added:3322802},
+  {date:'2026-02-19',asset:458871967,principal:458389509,added:85306000},
+  {date:'2026-02-20',asset:457777757,principal:458979509,added:590000},
+  {date:'2026-02-23',asset:499825838,principal:500146804,added:41167295},
+  {date:'2026-02-24',asset:495185313,principal:500146804,added:0},
+  {date:'2026-02-25',asset:495864946,principal:500146804,added:0},
+  {date:'2026-03-12',asset:506773820,principal:500146804,added:0},
+  {date:'2026-03-13',asset:501829238,principal:500146804,added:0},
+  {date:'2026-03-16',asset:501060083,principal:500146804,added:0},
+  {date:'2026-03-17',asset:504557017,principal:500146804,added:0},
+  {date:'2026-03-20',asset:499808960,principal:500146804,added:0},
+  {date:'2026-03-23',asset:493681001,principal:500146804,added:0},
+  {date:'2026-03-24',asset:496004352,principal:500146804,added:0},
+  {date:'2026-03-31',asset:481134092,principal:500146804,added:0},
+  {date:'2026-04-07',asset:499889598,principal:500146804,added:0},
+  {date:'2026-04-08',asset:496275708,principal:500146804,added:0},
+  {date:'2026-04-13',asset:512439165,principal:501646804,added:1500000},
+  {date:'2026-04-14',asset:519342976,principal:503385935,added:1749131},
+  {date:'2026-04-15',asset:525208430,principal:503385935,added:0},
+  {date:'2026-04-16',asset:536250244,principal:503385935,added:0},
+  {date:'2026-04-17',asset:540450774,principal:503385935,added:0},
+  {date:'2026-04-20',asset:544517427,principal:503385935,added:0},
+  {date:'2026-04-21',asset:542762267,principal:503385935,added:0},
+  {date:'2026-04-22',asset:543951328,principal:503385935,added:0},
+  {date:'2026-04-23',asset:552390122,principal:503385935,added:0},
+  {date:'2026-04-27',asset:556136384,principal:503385935,added:0},
+  {date:'2026-04-28',asset:557588274,principal:503385935,added:0},
+  {date:'2026-04-29',asset:559313314,principal:503385935,added:0},
+  {date:'2026-04-30',asset:563939847,principal:508253709,added:4867774},
+  {date:'2026-05-01',asset:567101444,principal:508253709,added:0},
+  {date:'2026-05-04',asset:569418695,principal:508253709,added:0},
+  {date:'2026-05-05',asset:572353605,principal:508253709,added:0},
+  {date:'2026-05-06',asset:574422839,principal:508253709,added:0},
+  {date:'2026-05-07',asset:583256415,principal:508253709,added:0},
+  {date:'2026-05-08',asset:594512612,principal:508253709,added:0},
+  {date:'2026-05-09',asset:595391560,principal:508253709,added:0},
+  {date:'2026-05-11',asset:603473782,principal:508253709,added:0},
+  {date:'2026-05-12',asset:610355732,principal:508253709,added:0},
+  {date:'2026-05-13',asset:610138614,principal:508253709,added:0},
+  {date:'2026-05-14',asset:631721226,principal:523725043,added:14132022},
+  {date:'2026-05-15',asset:627863705,principal:523725043,added:0},
+  {date:'2026-05-18',asset:627355441,principal:523725043,added:0},
+  {date:'2026-05-19',asset:623266368,principal:524313920,added:588877},
+  {date:'2026-05-20',asset:627988560,principal:524313920,added:0},
+  {date:'2026-05-21',asset:635257179,principal:524313920,added:0},
+  {date:'2026-05-22',asset:643675581,principal:524313920,added:0},
+  {date:'2026-05-25',asset:641645387,principal:524313920,added:0},
+  {date:'2026-05-26',asset:639621907,principal:524313920,added:0},
+];
 
-const fmtO = v => {
-  const a=Math.floor(v/1e8), m=Math.round((v%1e8)/1e4);
-  return a>0&&m>0?`${a}억 ${m.toLocaleString()}만`:(a>0?`${a}억`:`${m.toLocaleString()}만원`);
-};
-const fmtW = v => Math.round(v).toLocaleString();
-const fmtM = v => Math.round(v/1e4).toLocaleString()+'만';
-const val = (h, fx) => h.c==='USD' ? h.p*h.q*fx : h.p*h.q;
-const byType = (t, fx) => H.filter(h=>h.t===t).reduce((s,h)=>s+val(h,fx),0);
-const grand = (fx) => H.reduce((s,h)=>s+val(h,fx),0);
+let H=JSON.parse(localStorage.getItem('ttg_h3')||'null')||JSON.parse(JSON.stringify(DEF_H));
+let LOG=JSON.parse(localStorage.getItem('ttg_log4')||'null')||JSON.parse(JSON.stringify(DEF_LOG));
+let RT=JSON.parse(localStorage.getItem('ttg_rt3')||'null')||{fx:1504.77,pri:524313920};
 
-function toast(msg, isErr=false) {
-  const w = document.getElementById('toast-wrap');
-  const d = document.createElement('div');
-  d.className = 'toast' + (isErr?' err':'');
-  d.textContent = msg;
-  w.appendChild(d);
-  setTimeout(()=>d.remove(), 3000);
-}
+const fmtO=v=>{const a=Math.floor(v/1e8),m=Math.round((v%1e8)/1e4);return a>0&&m>0?`${a}억 ${m.toLocaleString()}만`:(a>0?`${a}억`:`${m.toLocaleString()}만원`);};
+const fmtW=v=>Math.round(v).toLocaleString();
+const fmtM=v=>Math.round(v/1e4).toLocaleString()+'만';
+const val=(h,fx)=>h.c==='USD'?h.p*h.q*fx:h.p*h.q;
+const byType=(t,fx)=>H.filter(h=>h.t===t).reduce((s,h)=>s+val(h,fx),0);
+const grand=(fx)=>H.reduce((s,h)=>s+val(h,fx),0);
 
-// ======= PRICE FETCH =======
-async function fetchFX() {
-  try {
-    const r = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-    const data = await r.json();
-    const fx = data.rates.KRW;
-    RT.fx = fx;
-    document.getElementById('ov-fx').textContent = fx.toLocaleString(undefined,{maximumFractionDigits:2});
-    document.getElementById('ov-fx-t').textContent = '실시간 (exchangerate-api)';
-    document.getElementById('rt-fx').textContent = fx.toLocaleString(undefined,{maximumFractionDigits:2});
-    document.getElementById('rt-fx-t').textContent = '실시간 자동';
-    return fx;
-  } catch(e) {
-    toast('환율 API 오류, 저장값 사용', true);
+function toast(msg,err=false){const w=document.getElementById('tw');const d=document.createElement('div');d.className='toast'+(err?' err':'');d.textContent=msg;w.appendChild(d);setTimeout(()=>d.remove(),3000);}
+
+async function fetchFX(){
+  try{
+    const r=await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    const data=await r.json();
+    RT.fx=data.rates.KRW;
+    ['ov-fx','rt-fx'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=RT.fx.toLocaleString(undefined,{maximumFractionDigits:2});});
     return RT.fx;
-  }
+  }catch(e){return RT.fx;}
 }
 
-async function fetchUSPrice(symbol) {
-  try {
-    const proxy = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
-    const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(proxy)}`);
-    const data = await r.json();
+async function fetchPrice(sym){
+  try{
+    const url=`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d`;
+    const r=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+    const data=await r.json();
     return data.chart.result[0].meta.regularMarketPrice;
-  } catch(e) {
-    return null;
-  }
+  }catch(e){return null;}
 }
 
-async function fetchKRPrice(symbol) {
-  try {
-    const proxy = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
-    const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(proxy)}`);
-    const data = await r.json();
-    return data.chart.result[0].meta.regularMarketPrice;
-  } catch(e) {
-    return null;
-  }
-}
-
-async function refreshPrices() {
-  const spin = document.getElementById('refresh-spin');
-  spin.style.display = 'inline-block';
-  toast('시세 업데이트 중...');
-
-  const fx = await fetchFX();
-  const usSymbols = [...new Set(H.filter(h=>h.sym).map(h=>h.sym))];
-  const krSymbols = [...new Set(H.filter(h=>h.krx).map(h=>h.krx))];
-
-  const priceMap = {};
+async function refreshPrices(){
+  document.getElementById('rspin').style.display='inline-block';
+  const fx=await fetchFX();
+  const usSym=[...new Set(H.filter(h=>h.sym).map(h=>h.sym))];
+  const krSym=[...new Set(H.filter(h=>h.krx).map(h=>h.krx))];
+  const pm={};
   await Promise.all([
-    ...usSymbols.map(async s => { const p = await fetchUSPrice(s); if(p) priceMap[s]=p; }),
-    ...krSymbols.map(async s => { const p = await fetchKRPrice(s); if(p) priceMap[s]=p; }),
+    ...usSym.map(async s=>{const p=await fetchPrice(s);if(p)pm[s]=p;}),
+    ...krSym.map(async s=>{const p=await fetchPrice(s);if(p)pm[s]=p;}),
   ]);
-
-  H.forEach(h => {
-    const key = h.sym || h.krx;
-    if(key && priceMap[key]) h.p = priceMap[key];
-  });
-
-  const now = new Date().toLocaleTimeString('ko-KR');
-  document.getElementById('last-update').textContent = now + ' 업데이트';
-  document.getElementById('rt-last').textContent = now;
-  pricesLoaded = true;
-  spin.style.display = 'none';
-  localStorage.setItem('ttg_h2', JSON.stringify(H));
-  calcRT();
-  renderOV();
-  if(document.getElementById('pg-rt').classList.contains('on')) renderRT();
-  if(document.getElementById('pg-hd').classList.contains('on')) renderHD();
+  H.forEach(h=>{const k=h.sym||h.krx;if(k&&pm[k])h.p=pm[k];});
+  const now=new Date().toLocaleTimeString('ko-KR');
+  document.getElementById('lu').textContent=now+' 업데이트';
+  document.getElementById('rt-last').textContent=now;
+  document.getElementById('rspin').style.display='none';
+  localStorage.setItem('ttg_h3',JSON.stringify(H));
+  calcRT();renderOV();
+  if(document.getElementById('pg-dy').classList.contains('on'))renderDY();
   toast('시세 업데이트 완료 (15분 지연)');
 }
 
-// ======= FIREBASE =======
-async function saveToFirebase(collection, id, data) {
-  if(!window._fbReady) return false;
-  try {
-    const {doc, setDoc} = window._firestore;
-    await setDoc(doc(window._db, collection, id), data);
-    document.getElementById('sync-dot').className = 'sync-dot ok';
-    return true;
-  } catch(e) {
-    document.getElementById('sync-dot').className = 'sync-dot';
-    return false;
-  }
+async function fbSave(col,id,data){
+  if(!window._fbReady)return false;
+  try{const{doc,setDoc}=window._fs;await setDoc(doc(window._db,col,id),data);document.getElementById('sync-dot').className='sync-dot ok';return true;}
+  catch(e){document.getElementById('sync-dot').className='sync-dot';return false;}
+}
+async function fbLoad(){
+  if(!window._fbReady)return;
+  try{
+    const{doc,getDoc,collection,getDocs,orderBy,query}=window._fs;
+    const hs=await getDoc(doc(window._db,'config','holdings'));
+    if(hs.exists())H=hs.data().items;
+    const ls=await getDocs(query(collection(window._db,'log'),orderBy('date','asc')));
+    if(!ls.empty){LOG=[];ls.forEach(d=>LOG.push(d.data()));}
+    document.getElementById('sync-dot').className='sync-dot ok';
+    toast('Firebase 로드 완료');
+  }catch(e){document.getElementById('sync-dot').className='sync-dot';}
+  renderAll();
 }
 
-async function loadFromFirebase() {
-  if(!window._fbReady) return;
-  try {
-    const {doc, getDoc, collection, getDocs, orderBy, query} = window._firestore;
-    // Load holdings
-    const hSnap = await getDoc(doc(window._db, 'config', 'holdings'));
-    if(hSnap.exists()) H = hSnap.data().items;
-    // Load RT config
-    const rtSnap = await getDoc(doc(window._db, 'config', 'rt'));
-    if(rtSnap.exists()) RT = rtSnap.data();
-    // Load LOG
-    const logSnap = await getDocs(query(collection(window._db,'log'), orderBy('date','asc')));
-    LOG = [];
-    logSnap.forEach(d => LOG.push(d.data()));
-    document.getElementById('sync-dot').className = 'sync-dot ok';
-    toast('Firebase 데이터 로드 완료');
-    renderOV();
-    renderLG();
-    renderLogChart();
-    if(document.getElementById('rt-pri')) document.getElementById('rt-pri').value = RT.pri||524313920;
-  } catch(e) {
-    document.getElementById('sync-dot').className = 'sync-dot';
-    if(e.message && e.message.includes('YOUR_API_KEY')) {
-      document.getElementById('setup-banner').style.display='block';
-    }
-    loadLocal();
-  }
-}
+function renderAll(){renderOV();renderRT();renderLG();renderLogChart();if(document.getElementById('pg-dy').classList.contains('on'))renderDY();}
 
-function loadLocal() {
-  LOG = JSON.parse(localStorage.getItem('ttg_log3')||'[]');
-  if(!LOG.length) {
-    LOG = [
-      {date:'2025-12-08',asset:375117560,principal:358351283,added:0},
-      {date:'2026-01-30',asset:384257189,principal:367550707,added:0},
-      {date:'2026-02-19',asset:458871967,principal:458389509,added:85306000},
-      {date:'2026-03-31',asset:481134092,principal:500146804,added:0},
-      {date:'2026-04-30',asset:563939847,principal:508253709,added:0},
-      {date:'2026-05-08',asset:594512612,principal:508253709,added:0},
-      {date:'2026-05-22',asset:643675581,principal:524313920,added:0},
-      {date:'2026-05-26',asset:639621907,principal:524313920,added:0},
-    ];
-  }
-  renderOV();renderLG();renderLogChart();
-}
+let charts={};
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 
-async function saveRT() {
-  localStorage.setItem('ttg_h2', JSON.stringify(H));
-  localStorage.setItem('ttg_rt2', JSON.stringify(RT));
-  const ok = await saveToFirebase('config','holdings',{items:H});
-  await saveToFirebase('config','rt',RT);
-  toast(ok ? 'Firebase 저장 완료' : '로컬 저장 완료 (Firebase 미연결)');
-}
-
-async function saveLogNow() {
-  const fx = RT.fx;
-  const tot = grand(fx);
-  const pri = parseFloat(document.getElementById('rt-pri').value)||RT.pri;
-  const added = parseFloat(document.getElementById('lg-add').value)||0;
-  const d = document.getElementById('lg-d').value || new Date().toISOString().slice(0,10);
-  document.getElementById('lg-a').value = Math.round(tot);
-  document.getElementById('lg-p').value = pri;
-  const entry = {date:d, asset:Math.round(tot), principal:pri, added};
-  LOG = LOG.filter(l=>l.date!==d);
-  LOG.push(entry);
-  LOG.sort((a,b)=>a.date.localeCompare(b.date));
-  localStorage.setItem('ttg_log3', JSON.stringify(LOG));
-  const ok = await saveToFirebase('log', d.replace(/-/g,''), entry);
-  toast(ok?'LOG Firebase 저장 완료':'LOG 로컬 저장 완료');
-  renderLG();renderLogChart();
-  if(document.getElementById('pg-ov').classList.contains('on')) renderOV();
-}
-
-// ======= PAGE NAV =======
-let charts = {};
-function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
-
-function sp(id) {
+function sp(id){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   document.getElementById('pg-'+id).classList.add('on');
-  const map={ov:'개요',rt:'실시간',hd:'보유종목',lg:'자산LOG',sc:'시나리오',cfg:'설정'};
+  const map={ov:'개요',rt:'실시간',lg:'자산LOG',sc:'시나리오',dy:'일일변동'};
   document.querySelectorAll('.tab').forEach(t=>{if(t.textContent===map[id])t.classList.add('on');});
-  if(id==='ov') renderOV();
-  if(id==='rt') renderRT();
-  if(id==='hd') renderHD();
+  if(id==='ov')renderOV();
+  if(id==='rt')renderRT();
   if(id==='lg'){renderLG();renderLogChart();}
   if(id==='sc'){calcSC();renderSCChart();}
-  if(id==='cfg') renderCFG();
+  if(id==='dy')renderDY();
 }
 
-// ======= OVERVIEW =======
-function renderOV() {
+function renderHoldingsGroup(tbodyId,subId,pctId,types,total,fx){
+  const tb=document.getElementById(tbodyId);if(!tb)return;tb.innerHTML='';let sub=0;
+  H.filter(h=>types.includes(h.t)).forEach(h=>{
+    const v=val(h,fx);sub+=v;
+    const pr=h.c==='USD'?'$'+h.p.toLocaleString(undefined,{maximumFractionDigits:2}):'₩'+h.p.toLocaleString();
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="nm" style="font-size:12px;">${h.a}</td><td class="nm" style="font-size:12px;">${h.e}</td><td><span class="tk ${h.cl}">${h.tk}</span></td><td>${h.q.toLocaleString()}</td><td style="color:var(--ac);font-size:12px;">${pr}</td><td class="ac">${fmtM(v)}</td><td style="font-size:11px;color:var(--t2);">${h.r||(v/total*100).toFixed(1)+'%'}</td>`;
+    tb.appendChild(tr);
+  });
+  const se=document.getElementById(subId);if(se)se.textContent='₩'+fmtW(sub);
+  const pe=document.getElementById(pctId);if(pe)pe.textContent=(sub/total*100).toFixed(1)+'%';
+}
+
+function renderOV(){
   const fx=RT.fx||1504.77;
-  const tot=grand(fx), pri=RT.pri||524313920, prf=tot-pri, rt=(prf/pri*100);
+  const tot=grand(fx),pri=RT.pri||524313920,prf=tot-pri,rt=(prf/pri*100);
   const prev=LOG.length>1?LOG[LOG.length-2]:null;
   const chg=prev?tot-prev.asset:0;
-  document.getElementById('ov-tot').textContent=fmtO(tot);
-  document.getElementById('ov-totr').textContent='₩'+fmtW(tot);
-  const ce=document.getElementById('ov-chg');
-  ce.textContent=(chg>=0?'▲ +':'▼ ')+fmtM(chg);ce.style.color=chg>=0?'#ef4444':'#3b82f6';
-  document.getElementById('ov-pri').textContent=fmtO(pri);
-  document.getElementById('ov-prf').textContent='+'+fmtO(prf);
-  document.getElementById('ov-rt').textContent='수익률 +'+rt.toFixed(2)+'%';
+  const se=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  se('ov-tot',fmtO(tot));se('ov-totr','₩'+fmtW(tot));
+  const ce=document.getElementById('ov-chg');if(ce){ce.textContent=(chg>=0?'▲ +':'▼ ')+fmtM(chg);ce.style.color=chg>=0?'#ef4444':'#3b82f6';}
+  se('ov-pri',fmtO(pri));se('ov-prf','+'+fmtO(prf));se('ov-rt','수익률 +'+rt.toFixed(2)+'%');
   const pct=tot/1e10*100;
-  document.getElementById('g-pct').textContent=pct.toFixed(2)+'%';
-  document.getElementById('g-rem').textContent='잔여: '+fmtO(1e10-tot);
-  const arc=document.getElementById('g-arc');
-  if(arc){const c=175.9;arc.setAttribute('stroke-dashoffset',(c-c*pct/100).toFixed(1));}
-  const d=byType('d',fx),dc=byType('p',fx),isa=byType('i',fx),rsa=byType('r',fx);
-  const s=(id,pfId,v)=>{document.getElementById(id).textContent=(v/tot*100).toFixed(1)+'%';document.getElementById(pfId).style.width=(v/tot*100).toFixed(1)+'%';};
-  s('pp-d','pf-d',d);s('pp-dc','pf-dc',dc);s('pp-i','pf-i',isa);s('pp-r','pf-r',rsa);
+  se('g-pct',pct.toFixed(2)+'%');se('g-rem','잔여: '+fmtO(1e10-tot));
+  const arc=document.getElementById('g-arc');if(arc){const c=188.5;arc.setAttribute('stroke-dashoffset',(c-c*pct/100).toFixed(1));}
+  const d=byType('d',fx),dc2=byType('p',fx),isa=byType('i',fx),rsa=byType('r',fx);
+  const sp2=(id,pfId,v)=>{se(id,(v/tot*100).toFixed(1)+'%');const e=document.getElementById(pfId);if(e)e.style.width=(v/tot*100).toFixed(1)+'%';};
+  sp2('pp-d','pf-d',d);sp2('pp-dc','pf-dc',dc2);sp2('pp-i','pf-i',isa);sp2('pp-r','pf-r',rsa);
 
-  destroyChart('trend');
+  dc('trend');
   if(LOG.length>0){
     charts['trend']=new Chart(document.getElementById('c-trend'),{type:'line',
-      data:{labels:LOG.map(l=>l.date.slice(5)),datasets:[{data:LOG.map(l=>l.asset),borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.5,pointRadius:2,tension:0.4}]},
+      data:{labels:LOG.map(l=>l.date.slice(5)),datasets:[{data:LOG.map(l=>l.asset),borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.5,pointRadius:1,tension:0.4}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.parsed.y/1e8).toFixed(2)+'억'}}},
-      scales:{x:{ticks:{font:{size:9},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{callback:v=>(v/1e8).toFixed(0)+'억',font:{size:9},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
+      scales:{x:{ticks:{font:{size:10},color:'#484f58',maxTicksLimit:10},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{callback:v=>(v/1e8).toFixed(0)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
   }
-
-  const st={qm:0,ql:0,sp:0,sg:0};
-  H.forEach(h=>{st[h.cl]+=val(h,fx);});
+  const st={qm:0,ql:0,sp:0,sg:0};H.forEach(h=>{st[h.cl]+=val(h,fx);});
   const stot=Object.values(st).reduce((a,b)=>a+b,0);
   const clrs={qm:'#00d4aa',ql:'#3b82f6',sp:'#f59e0b',sg:'#64748b'};
   const lbs={qm:'QQQM',ql:'QLD',sp:'SPYM',sg:'SGOV'};
-  destroyChart('strat');
+  dc('strat');
   charts['strat']=new Chart(document.getElementById('c-strat'),{type:'doughnut',
     data:{labels:Object.keys(st).map(k=>lbs[k]),datasets:[{data:Object.values(st),backgroundColor:Object.keys(st).map(k=>clrs[k]),borderWidth:0,hoverOffset:4}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+(c.parsed/stot*100).toFixed(1)+'%'}}}}});
-  const leg=document.getElementById('strat-leg');leg.innerHTML='';
-  Object.keys(st).forEach(k=>{leg.innerHTML+=`<span style="font-size:10px;color:var(--t2);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:${clrs[k]};display:inline-block;"></span>${lbs[k]} ${(st[k]/stot*100).toFixed(1)}%</span>`;});
-
+  const leg=document.getElementById('strat-leg');if(leg){leg.innerHTML='';Object.keys(st).forEach(k=>{leg.innerHTML+=`<span style="font-size:11px;color:var(--t2);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:2px;background:${clrs[k]};display:inline-block;"></span>${lbs[k]} ${(st[k]/stot*100).toFixed(1)}%</span>`;});}
   const accts=[
     {l:'직투',v:byType('d',fx)},{l:'삼성DC',v:H.filter(h=>h.a==='삼성 DC').reduce((s,h)=>s+val(h,fx),0)},
     {l:'와이프직투',v:H.filter(h=>h.a==='와이프 삼성').reduce((s,h)=>s+val(h,fx),0)},
     {l:'ISA',v:byType('i',fx)},{l:'자녀',v:H.filter(h=>h.a==='나율 삼성'||h.a==='다윤 삼성').reduce((s,h)=>s+val(h,fx),0)},
     {l:'RSA',v:byType('r',fx)},{l:'IRP',v:H.filter(h=>h.a==='나무 IRP').reduce((s,h)=>s+val(h,fx),0)},
   ];
-  destroyChart('acct');
+  dc('acct');
   charts['acct']=new Chart(document.getElementById('c-acct'),{type:'bar',
     data:{labels:accts.map(a=>a.l),datasets:[{data:accts.map(a=>a.v),backgroundColor:['#3b82f6','#f59e0b','#60a5fa','#00d4aa','#a855f7','#ec4899','#64748b'],borderRadius:3}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.parsed.x/1e8).toFixed(2)+'억'}}},
-    scales:{x:{ticks:{callback:v=>(v/1e8).toFixed(0)+'억',font:{size:9},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{font:{size:10},color:'#8b949e'},grid:{display:false}}}}});
+    scales:{x:{ticks:{callback:v=>(v/1e8).toFixed(0)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{font:{size:11},color:'#8b949e'},grid:{display:false}}}}});
+
+  renderHoldingsGroup('ov-direct','ov-ds','ov-dp',['d'],tot,fx);
+  renderHoldingsGroup('ov-isa','ov-is','ov-ip',['i'],tot,fx);
+  renderHoldingsGroup('ov-pen','ov-ps','ov-pp',['r','p'],tot,fx);
 }
 
-// ======= REALTIME =======
-function renderRT() {
-  if(document.getElementById('rt-pri')) document.getElementById('rt-pri').value = RT.pri||524313920;
-  const tb=document.getElementById('rt-tbody');tb.innerHTML='';
-  H.forEach((h,i)=>{
-    const v=val(h,RT.fx);
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td class="nm" style="font-size:10px;">${h.a}</td><td class="nm" style="font-size:10px;">${h.e}</td><td><span class="tk ${h.cl}">${h.tk}</span></td><td style="font-size:10px;" id="rp-${i}">${h.c==='USD'?'$'+h.p.toLocaleString(undefined,{maximumFractionDigits:2}):'₩'+h.p.toLocaleString()}</td><td><input type="number" value="${h.q}" step="0.0001" style="width:80px;" onchange="updQ(${i},this.value)"></td><td class="ac" id="rtv-${i}">${fmtM(v)}</td>`;
-    tb.appendChild(tr);
-  });
-  calcRT();
-}
-
-function updQ(i,v){H[i].q=parseFloat(v)||0;calcRT();}
-
-function calcRT() {
+function renderRT(){
   const fx=RT.fx||1504.77;
-  const pri=parseFloat(document.getElementById('rt-pri')?.value)||RT.pri;
-  RT.pri=pri;
-  const tot=grand(fx),prf=tot-pri,rt=(prf/pri*100);
+  const tot=grand(fx),pri=RT.pri||524313920,prf=tot-pri,rt=(prf/pri*100);
   const prev=LOG.length>1?LOG[LOG.length-2]:null;
   const chg=prev?tot-prev.asset:0;
-  const setEl=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
-  setEl('rt-tot',fmtO(tot));setEl('rt-totr','₩'+fmtW(tot));
-  const ce=document.getElementById('rt-chg');
-  if(ce){ce.textContent=(chg>=0?'+':'')+fmtM(chg);ce.className='mv '+(chg>=0?'gn':'rd');}
-  setEl('rt-chgp',(chg>=0?'▲':'▼')+' '+(prev?Math.abs(chg/prev.asset*100).toFixed(2):0)+'%');
-  setEl('rt-prf','+'+fmtO(prf));setEl('rt-rtp','+'+rt.toFixed(2)+'%');
+  const se=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  se('rt-tot',fmtO(tot));se('rt-totr','₩'+fmtW(tot));
+  const ce=document.getElementById('rt-chg');if(ce){ce.textContent=(chg>=0?'+':'')+fmtM(chg);ce.className='mv '+(chg>=0?'gn':'rd');}
+  se('rt-chgp',(chg>=0?'▲':'▼')+' '+(prev?Math.abs(chg/prev.asset*100).toFixed(2):0)+'%');
+  se('rt-prf','+'+fmtO(prf));se('rt-rtp','+'+rt.toFixed(2)+'%');
   const ad=tot-ATH;const ae=document.getElementById('rt-ath');
   if(ae){ae.textContent=(ad>=0?'+':'')+fmtM(ad);ae.className='mv sm '+(ad>=0?'gn':'rd');}
-  H.forEach((h,i)=>{const e=document.getElementById('rtv-'+i);if(e)e.textContent=fmtM(val(h,fx));});
-  setEl('rt-grand','₩'+fmtW(tot));
-  document.getElementById('lg-a').value=Math.round(tot);
+  const tb=document.getElementById('rt-tbody');if(!tb)return;tb.innerHTML='';
+  H.forEach(h=>{
+    const v=val(h,fx);
+    const pr=h.c==='USD'?'$'+h.p.toLocaleString(undefined,{maximumFractionDigits:2}):'₩'+h.p.toLocaleString();
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="nm" style="font-size:12px;">${h.a}</td><td class="nm" style="font-size:12px;">${h.e}</td><td><span class="tk ${h.cl}">${h.tk}</span></td><td style="color:var(--ac);">${pr}</td><td>${h.q.toLocaleString()}</td><td class="ac">${fmtM(v)}</td>`;
+    tb.appendChild(tr);
+  });
+  se('rt-grand','₩'+fmtW(tot));
+  const la=document.getElementById('lg-a');if(la)la.value=Math.round(tot);
 }
 
-// ======= HOLDINGS =======
-function renderHD() {
-  const fx=RT.fx,tot=grand(fx);
-  const rnd=(tbId,subId,pctId,types)=>{
-    const tb=document.getElementById(tbId);tb.innerHTML='';let sub=0;
-    H.filter(h=>types.includes(h.t)).forEach(h=>{
-      const v=val(h,fx);sub+=v;
-      const pr=h.c==='USD'?'$'+h.p.toLocaleString(undefined,{maximumFractionDigits:2}):'₩'+h.p.toLocaleString();
-      const tr=document.createElement('tr');
-      tr.innerHTML=`<td class="nm" style="font-size:10px;">${h.a}</td><td class="nm" style="font-size:10px;">${h.e}</td><td><span class="tk ${h.cl}">${h.tk}</span></td><td>${h.q.toLocaleString()}</td><td style="font-size:10px;color:var(--ac);">${pr}</td><td class="ac">${fmtM(v)}</td><td style="font-size:10px;color:var(--t2);">${h.r||(v/tot*100).toFixed(1)+'%'}</td>`;
-      tb.appendChild(tr);
-    });
-    document.getElementById(subId).textContent='₩'+fmtW(sub);
-    document.getElementById(pctId).textContent=(sub/tot*100).toFixed(1)+'%';
-  };
-  rnd('hd-direct','hd-ds','hd-dp',['d']);
-  rnd('hd-isa','hd-is','hd-ip',['i']);
-  rnd('hd-pen','hd-ps','hd-pp',['r','p']);
+function calcRT(){renderRT();}
+
+async function saveLogNow(){
+  const fx=RT.fx;const tot=grand(fx);
+  const d=new Date().toISOString().slice(0,10);
+  const pri=RT.pri||524313920;
+  const entry={date:d,asset:Math.round(tot),principal:pri,added:0};
+  LOG=LOG.filter(l=>l.date!==d);LOG.push(entry);LOG.sort((a,b)=>a.date.localeCompare(b.date));
+  localStorage.setItem('ttg_log4',JSON.stringify(LOG));
+  const ok=await fbSave('log',d.replace(/-/g,''),entry);
+  toast(ok?'오늘 LOG Firebase 저장 완료':'오늘 LOG 로컬 저장 완료');
+  renderLG();renderLogChart();
 }
 
-// ======= LOG =======
-async function addLog() {
+async function addLog(){
   const d=document.getElementById('lg-d').value;
   const a=parseFloat(document.getElementById('lg-a').value)||grand(RT.fx);
   const p=parseFloat(document.getElementById('lg-p').value)||RT.pri;
@@ -654,43 +573,39 @@ async function addLog() {
   if(!d)return toast('날짜를 입력하세요',true);
   const entry={date:d,asset:Math.round(a),principal:p,added};
   LOG=LOG.filter(l=>l.date!==d);LOG.push(entry);LOG.sort((x,y)=>x.date.localeCompare(y.date));
-  localStorage.setItem('ttg_log3',JSON.stringify(LOG));
-  const ok=await saveToFirebase('log',d.replace(/-/g,''),entry);
+  localStorage.setItem('ttg_log4',JSON.stringify(LOG));
+  const ok=await fbSave('log',d.replace(/-/g,''),entry);
   toast(ok?'LOG Firebase 저장':'LOG 로컬 저장');
   renderLG();renderLogChart();
-  if(document.getElementById('pg-ov').classList.contains('on'))renderOV();
 }
-async function delLog(d){LOG=LOG.filter(l=>l.date!==d);localStorage.setItem('ttg_log3',JSON.stringify(LOG));renderLG();renderLogChart();}
-async function clearLog(){if(confirm('전체 삭제?')){LOG=[];localStorage.setItem('ttg_log3',JSON.stringify(LOG));renderLG();renderLogChart();}}
+async function delLog(d){LOG=LOG.filter(l=>l.date!==d);localStorage.setItem('ttg_log4',JSON.stringify(LOG));renderLG();renderLogChart();}
+async function clearLog(){if(confirm('전체 삭제?')){LOG=[];localStorage.setItem('ttg_log4',JSON.stringify(LOG));renderLG();renderLogChart();}}
 
 function renderLG(){
-  const el=document.getElementById('lg-list');el.innerHTML='';
+  const el=document.getElementById('lg-list');if(!el)return;el.innerHTML='';
   [...LOG].reverse().forEach((l,ri)=>{
-    const i=LOG.length-1-ri;
-    const prev=i>0?LOG[i-1]:null;
-    const chg=prev?l.asset-prev.asset:0;
-    const prf=l.asset-l.principal,rt=(prf/l.principal*100);
+    const i=LOG.length-1-ri;const prev=i>0?LOG[i-1]:null;
+    const chg=prev?l.asset-prev.asset:0;const prf=l.asset-l.principal,rt=(prf/l.principal*100);
     const row=document.createElement('div');
-    row.style.cssText='display:grid;grid-template-columns:95px 130px 110px 110px 90px 100px 50px;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.03);';
-    row.innerHTML=`<div style="font-family:monospace;font-size:11px;color:var(--t2);">${l.date}</div><div style="font-family:monospace;font-size:11px;color:var(--t1);">${fmtO(l.asset)}</div><div style="font-family:monospace;font-size:10px;color:${chg>=0?'#10b981':'#ef4444'};">${chg===0?'-':(chg>=0?'+':'')+fmtM(chg)}</div><div style="font-family:monospace;font-size:10px;color:#10b981;">+${fmtM(prf)}</div><div style="font-family:monospace;font-size:10px;color:#00d4aa;">+${rt.toFixed(1)}%</div><div style="font-family:monospace;font-size:10px;color:var(--am);">${l.added?'+'+fmtM(l.added):'-'}</div><button class="btn rd sm" onclick="delLog('${l.date}')">삭제</button>`;
+    row.style.cssText='display:grid;grid-template-columns:100px 140px 115px 115px 90px 110px 50px;gap:6px;align-items:center;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,0.03);';
+    row.innerHTML=`<div style="font-family:monospace;font-size:12px;color:var(--t2);">${l.date}</div><div style="font-family:monospace;font-size:12px;color:var(--t1);">${fmtO(l.asset)}</div><div style="font-family:monospace;font-size:11px;color:${chg>=0?'#10b981':'#ef4444'};">${chg===0?'-':(chg>=0?'+':'')+fmtM(chg)}</div><div style="font-family:monospace;font-size:11px;color:#10b981;">+${fmtM(prf)}</div><div style="font-family:monospace;font-size:11px;color:#00d4aa;">+${rt.toFixed(1)}%</div><div style="font-family:monospace;font-size:11px;color:var(--am);">${l.added?'+'+fmtM(l.added):'-'}</div><button class="btn rd sm" onclick="delLog('${l.date}')">삭제</button>`;
     el.appendChild(row);
   });
-  if(document.getElementById('lg-a')) document.getElementById('lg-a').value=Math.round(grand(RT.fx));
+  const la=document.getElementById('lg-a');if(la)la.value=Math.round(grand(RT.fx));
+  const lp=document.getElementById('lg-p');if(lp&&!lp.value)lp.value=RT.pri||524313920;
 }
 
 function renderLogChart(){
-  destroyChart('log');
-  if(!LOG.length)return;
+  dc('log');if(!LOG.length)return;
   charts['log']=new Chart(document.getElementById('c-log'),{type:'line',
     data:{labels:LOG.map(l=>l.date.slice(5)),datasets:[
-      {label:'총 자산',data:LOG.map(l=>l.asset),borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.5,pointRadius:2,tension:0.4},
+      {label:'총 자산',data:LOG.map(l=>l.asset),borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.5,pointRadius:1,tension:0.4},
       {label:'수익금',data:LOG.map(l=>l.asset-l.principal),borderColor:'#10b981',fill:false,borderWidth:1,pointRadius:0,tension:0.4,borderDash:[4,3]},
     ]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.parsed.y/1e8).toFixed(2)+'억'}}},
-    scales:{x:{ticks:{font:{size:9},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{callback:v=>(v/1e8).toFixed(0)+'억',font:{size:9},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
+    scales:{x:{ticks:{font:{size:10},color:'#484f58',maxTicksLimit:12},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{callback:v=>(v/1e8).toFixed(0)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
 }
 
-// ======= SCENARIO =======
 function calcSC(){
   const init=parseFloat(document.getElementById('sc-i').value)||84171460;
   const monthly=(parseFloat(document.getElementById('sc-m').value)||200)*10000;
@@ -703,8 +618,8 @@ function calcSC(){
   rates.forEach((r,ri)=>{
     const tot=calc(r),ann=tot*divR,mon=ann/12,mult=(tot/pri).toFixed(1),pct=(tot/maxV*100).toFixed(0);
     const row=document.createElement('div');
-    row.style.cssText='display:grid;grid-template-columns:60px 130px 1fr 110px 110px 70px;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);';
-    row.innerHTML=`<div style="font-family:monospace;font-weight:700;font-size:13px;color:${colors[ri]};">${r}%</div><div style="font-family:monospace;font-size:11px;color:#e6edf3;">${fmtO(tot)}</div><div><div style="height:4px;background:#21262d;border-radius:2px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${colors[ri]};border-radius:2px;"></div></div></div><div style="font-family:monospace;font-size:11px;color:${colors[ri]};text-align:right;">${fmtO(ann)}</div><div style="font-family:monospace;font-size:13px;font-weight:700;color:${colors[ri]};text-align:right;">${Math.round(mon/1e4).toLocaleString()}만원</div><div style="font-family:monospace;font-size:11px;color:#8b949e;text-align:right;">${mult}배</div>`;
+    row.style.cssText='display:grid;grid-template-columns:65px 140px 1fr 120px 120px 75px;gap:6px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.04);';
+    row.innerHTML=`<div style="font-family:monospace;font-weight:700;font-size:14px;color:${colors[ri]};">${r}%</div><div style="font-family:monospace;font-size:12px;color:#e6edf3;">${fmtO(tot)}</div><div><div style="height:4px;background:#21262d;border-radius:2px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${colors[ri]};border-radius:2px;"></div></div></div><div style="font-family:monospace;font-size:12px;color:${colors[ri]};text-align:right;">${fmtO(ann)}</div><div style="font-family:monospace;font-size:13px;font-weight:700;color:${colors[ri]};text-align:right;">${Math.round(mon/1e4).toLocaleString()}만원</div><div style="font-family:monospace;font-size:12px;color:#8b949e;text-align:right;">${mult}배</div>`;
     cont.appendChild(row);
   });
 }
@@ -713,50 +628,44 @@ function renderSCChart(){
   const base=grand(RT.fx)||384972349;
   const yrs=Array.from({length:21},(_,i)=>i);
   const rates=[{r:7,c:'#64748b'},{r:10,c:'#3b82f6'},{r:15,c:'#a855f7'},{r:20,c:'#f59e0b'},{r:25,c:'#ef4444'}];
-  destroyChart('sc');
+  dc('sc');
   charts['sc']=new Chart(document.getElementById('c-sc'),{type:'line',
     data:{labels:yrs.map(y=>(40+y)+'세'),datasets:rates.map(({r,c})=>({label:r+'%',data:yrs.map(y=>base*Math.pow(1+r/100,y)),borderColor:c,backgroundColor:'transparent',borderWidth:1.5,pointRadius:0,tension:0.4}))},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y/1e8).toFixed(1)+'억'}}},
-    scales:{x:{ticks:{font:{size:9},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{callback:v=>(v/1e8).toFixed(0)+'억',font:{size:9},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
+    scales:{x:{ticks:{font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{callback:v=>(v/1e8).toFixed(0)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
   const leg=document.getElementById('sc-leg');leg.innerHTML='';
-  rates.forEach(({r,c})=>{leg.innerHTML+=`<span style="font-size:10px;color:#8b949e;display:flex;align-items:center;gap:4px;"><span style="width:16px;height:2px;background:${c};display:inline-block;"></span>${r}%</span>`;});
+  rates.forEach(({r,c})=>{leg.innerHTML+=`<span style="font-size:12px;color:#8b949e;display:flex;align-items:center;gap:5px;"><span style="width:18px;height:2px;background:${c};display:inline-block;"></span>${r}%</span>`;});
 }
 
-// ======= CONFIG =======
-function renderCFG(){
-  const tb=document.getElementById('cfg-tbody');tb.innerHTML='';
+function renderDY(){
+  const fx=RT.fx||1504.77;
+  const tb=document.getElementById('dy-tbody');if(!tb)return;tb.innerHTML='';
+  let tot2=0;
   H.forEach((h,i)=>{
+    const v=val(h,fx);tot2+=v;
+    const pr=h.c==='USD'?'$'+h.p.toLocaleString(undefined,{maximumFractionDigits:2}):'₩'+h.p.toLocaleString();
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td class="nm" style="font-size:10px;">${h.a}</td><td class="nm" style="font-size:10px;">${h.e}</td><td><span class="tk ${h.cl}">${h.tk}</span></td><td><input type="number" value="${h.q}" step="0.0001" style="width:90px;" id="cfg-q-${i}"></td><td><button class="btn sm" onclick="saveCfgRow(${i})">저장</button></td>`;
+    tr.innerHTML=`<td class="nm" style="font-size:12px;">${h.a}</td><td class="nm" style="font-size:12px;">${h.e}</td><td><span class="tk ${h.cl}">${h.tk}</span></td><td><input type="number" value="${h.q}" step="0.0001" style="width:110px;" id="dy-q-${i}" onchange="updDY(${i},this.value)"></td><td style="color:var(--ac);font-size:12px;">${pr}</td><td class="ac" id="dy-v-${i}">${fmtM(v)}</td>`;
     tb.appendChild(tr);
   });
+  document.getElementById('dy-grand').textContent='₩'+fmtW(tot2);
 }
-async function saveCfgRow(i){
-  const v=parseFloat(document.getElementById('cfg-q-'+i).value);
-  if(!isNaN(v))H[i].q=v;
-  await saveRT();toast('수량 저장 완료');calcRT();
+function updDY(i,v){H[i].q=parseFloat(v)||0;const fx=RT.fx;const nv=val(H[i],fx);const e=document.getElementById('dy-v-'+i);if(e)e.textContent=fmtM(nv);let t=0;H.forEach(h=>t+=val(h,fx));const ge=document.getElementById('dy-grand');if(ge)ge.textContent='₩'+fmtW(t);}
+async function saveDY(){
+  localStorage.setItem('ttg_h3',JSON.stringify(H));
+  const ok=await fbSave('config','holdings',{items:H});
+  toast(ok?'수량 Firebase 저장 완료':'수량 로컬 저장 완료');
+  renderOV();renderRT();
 }
+function resetDY(){if(confirm('기본값으로 복원할까요?')){H=JSON.parse(JSON.stringify(DEF_H));localStorage.setItem('ttg_h3',JSON.stringify(H));renderDY();renderOV();toast('기본값 복원 완료');}}
 
-// ======= INIT =======
-document.getElementById('lg-d').valueAsDate = new Date();
-
-window.addEventListener('fbready', loadFromFirebase);
-if(window._fbReady) loadFromFirebase();
-else {
-  loadLocal();
-  fetchFX();
-}
-
-setTimeout(()=>{
-  if(!window._fbReady) {
-    document.getElementById('setup-banner').style.display='block';
-    loadLocal();
-    fetchFX();
-  }
-}, 3000);
-
-// 5분마다 환율 자동 갱신
-setInterval(fetchFX, 5*60*1000);
+// INIT
+document.getElementById('lg-d').valueAsDate=new Date();
+window.addEventListener('fbready',fbLoad);
+if(window._fbReady)fbLoad();
+else{setTimeout(()=>{if(!window._fbReady){renderAll();}},2000);}
+fetchFX();
+setInterval(fetchFX,5*60*1000);
 </script>
 </body>
 </html>
