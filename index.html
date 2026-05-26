@@ -102,13 +102,13 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집대시보드</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산현황</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
     <div class="tab" onclick="sp('lg')">자산LOG</div>
     <div class="tab" onclick="sp('sc')">시나리오</div>
-    <div class="tab" onclick="sp('dy')">일일변동</div>
+    <div class="tab" onclick="sp('dy')">수량입력</div>
   </div>
   <div class="nav-right">
     <div class="sync-dot" id="sync-dot"></div>
@@ -154,25 +154,33 @@ input[type=number]{text-align:left;}
   </div>
 
   <!-- 보유종목 인라인 -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 12px 0;">
+    <span style="font-size:12px;color:var(--t2);">개요 정렬</span>
+    <button class="btn sm" onclick="setOVSort('value','desc')">평가액 ↓</button>
+    <button class="btn sm" onclick="setOVSort('value','asc')">평가액 ↑</button>
+    <button class="btn sm" onclick="setOVSort('pct','desc')">비중 ↓</button>
+    <button class="btn sm" onclick="setOVSort('pct','asc')">비중 ↑</button>
+    <span class="lu" id="ov-sort-label">평가액 내림차순</span>
+  </div>
   <div class="sec mb">직투 계좌</div>
   <div class="card mb">
-    <table><thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
+    <table><thead><tr><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
     <tbody id="ov-direct"></tbody>
-    <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="ov-ds">-</td><td class="gn" id="ov-dp">-</td></tr></tfoot>
+    <tfoot><tr><td colspan="3" class="nm">소계</td><td class="ac" id="ov-ds">-</td><td class="gn" id="ov-dp">-</td></tr></tfoot>
     </table>
   </div>
   <div class="sec mb">ISA 계좌</div>
   <div class="card mb">
-    <table><thead><tr><th>계좌</th><th>ETF명 (코드)</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>역할</th></tr></thead>
+    <table><thead><tr><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
     <tbody id="ov-isa"></tbody>
-    <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="ov-is">-</td><td style="color:var(--ac);font-size:11px;" id="ov-ip">-</td></tr></tfoot>
+    <tfoot><tr><td colspan="3" class="nm">소계</td><td class="ac" id="ov-is">-</td><td style="color:var(--ac);font-size:11px;" id="ov-ip">-</td></tr></tfoot>
     </table>
   </div>
   <div class="sec mb">RSA / IRP·DC</div>
   <div class="card">
-    <table><thead><tr><th>계좌</th><th>ETF명 (코드)</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>역할</th></tr></thead>
+    <table><thead><tr><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
     <tbody id="ov-pen"></tbody>
-    <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="ov-ps">-</td><td style="color:var(--am);font-size:11px;" id="ov-pp">-</td></tr></tfoot>
+    <tfoot><tr><td colspan="3" class="nm">소계</td><td class="ac" id="ov-ps">-</td><td style="color:var(--am);font-size:11px;" id="ov-pp">-</td></tr></tfoot>
     </table>
   </div>
 </div>
@@ -189,8 +197,14 @@ input[type=number]{text-align:left;}
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
     <button class="btn" onclick="refreshPrices()"><span class="spinner" id="rspin" style="display:none;"></span> 시세 새로고침</button>
     <button class="btn am" onclick="saveLogNow()">오늘 LOG 저장</button>
-    <div style="font-size:12px;color:var(--t3);">수량 변경은 [일일변동] 탭에서</div>
+    <div style="font-size:12px;color:var(--t3);">수량 변경은 [수량입력] 탭에서</div>
     <span class="lu" id="rt-last">-</span>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+    <span style="font-size:12px;color:var(--t2);">실시간 평가액 정렬</span>
+    <button class="btn sm" onclick="setRTSort('value','desc')">평가액 ↓</button>
+    <button class="btn sm" onclick="setRTSort('value','asc')">평가액 ↑</button>
+    <span class="lu" id="rt-sort-label">평가액 내림차순</span>
   </div>
   <div class="card">
     <table>
@@ -203,63 +217,22 @@ input[type=number]{text-align:left;}
 
 <!-- LOG -->
 <div class="pg" id="pg-lg">
-  <div class="sec mb">자산 LOG 입력</div>
+  <div class="sec mb">금일 추가투입금</div>
   <div class="card mb">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
-      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">날짜</div><input type="date" id="lg-d"></div>
-      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">총 자산 (자동)</div><input type="number" id="lg-a" style="width:140px;" readonly placeholder="자동계산"></div>
-      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">투입 원금</div><input type="number" id="lg-p" style="width:140px;" placeholder="524313920"></div>
-      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">추가 투입금</div><input type="number" id="lg-add" style="width:110px;" placeholder="0"></div>
-      <button class="btn" onclick="addLog()">저장</button>
-      <button class="btn rd sm" onclick="clearLog()">전체삭제</button>
+      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">금일 추가투입금</div><input type="number" id="lg-add" style="width:150px;" placeholder="0"></div>
+      <div style="font-size:12px;color:var(--t3);align-self:center;">LOG 기록은 [실시간] 탭의 오늘 LOG 저장 버튼으로만 저장됩니다.</div>
     </div>
   </div>
-
-  <div class="sec mb">엑셀 과거 데이터 일괄 입력</div>
-  <div class="card mb">
-    <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:8px;">
-      엑셀에서 <b>날짜 / 총자산 / 누적수익금 / 누적원금 / 추가투입금</b> 형태로 복사해서 붙여넣으면 LOG에 일괄 반영됩니다.<br>
-      숫자 쉼표(예: 495,185,313)는 그대로 두세요. 날짜는 2026-02-24 / 2026.02.24 / 26.02.24 모두 인식합니다.<br>
-      총자산 옆에 전일대비만 붙여넣어도 됩니다. 누적원금이 없으면 기존 LOG/기본값에서 자동 보정합니다.
-    </div>
-    <textarea id="lg-import" style="width:100%;min-height:180px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:9px 10px;border-radius:5px;font-family:monospace;font-size:12px;outline:none;resize:vertical;">날짜	총자산	누적수익금	누적원금
-2025-12-01	₩372,613,268	₩14,261,985	₩358,351,283
-2025-12-31	₩367,843,904	₩9,492,621	₩358,351,283
-2026-01-26	₩373,950,790	₩11,873,104	₩362,077,686
-2026-01-30	₩379,735,591	₩12,184,884	₩367,550,707
-2026-02-06	₩374,671,233	₩6,810,526	₩367,860,707
-2026-02-09	₩378,922,676	₩9,661,969	₩369,260,707
-2026-02-10	₩377,080,602	₩7,719,895	₩369,360,707
-2026-02-12	₩370,072,257	₩-2,611,252	₩372,683,509
-2026-02-19	₩458,133,306	₩-256,203	₩458,389,509
-2026-02-20	₩460,653,859	₩1,674,350	₩458,979,509
-2026-02-23	₩492,874,879	₩-7,271,925	₩500,146,804
-2026-04-02	₩496,652,562	₩-3,494,242	₩500,146,804
-2026-04-13	₩517,603,173	₩15,956,369	₩501,646,804
-2026-04-14	₩526,092,092	₩22,706,157	₩503,385,935
-2026-04-30	₩563,900,241	₩55,646,532	₩508,253,709
-2026-05-08	₩595,286,505	₩87,032,796	₩508,253,709
-2026-05-13	₩627,275,715	₩103,550,672	₩523,725,043
-2026-05-19	₩624,460,195	₩100,146,275	₩524,313,920
-2026-05-22	₩643,439,049	₩119,125,129	₩524,313,920</textarea>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-      <button class="btn" onclick="importExcelLog()">엑셀 데이터 LOG 반영</button>
-      <button class="btn am" onclick="uploadAllLog()">현재 LOG 전체 Firebase 업로드</button>
-      <button class="btn rd sm" onclick="repairBadLog()">깨진 LOG 자동복구</button>
-      <button class="btn rd sm" onclick="document.getElementById('lg-import').value=''">입력창 비우기</button>
-    </div>
-  </div>
-
   <div class="sec mb">LOG 히스토리</div>
   <div class="card mb">
-    <div style="display:grid;grid-template-columns:100px 140px 115px 115px 90px 110px 50px;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);">
+    <div style="display:grid;grid-template-columns:100px 140px 115px 115px 90px 110px;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);">
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">날짜</div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">총 자산</div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">전일대비</div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">수익금</div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">수익률</div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">추가투입</div>
-      <div></div>
     </div>
     <div id="lg-list"></div>
   </div>
@@ -271,11 +244,11 @@ input[type=number]{text-align:left;}
   <div class="sec mb">ISA 시나리오 (50세 은퇴)</div>
   <div class="card mb">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
-      <span style="font-size:13px;color:var(--t2);">ISA현재</span><input type="number" id="sc-i" value="84171460" style="width:130px;">
+      <span style="font-size:13px;color:var(--t2);">ISA현재</span><span id="sc-i" style="min-width:130px;font-family:monospace;font-size:14px;color:var(--ac);background:var(--bg3);border:1px solid var(--border);padding:6px 8px;border-radius:5px;display:inline-block;">-</span>
       <span style="font-size:13px;color:var(--t2);">월불입(만원)</span><input type="number" id="sc-m" value="200" style="width:80px;">
       <span style="font-size:13px;color:var(--t2);">기간(년)</span><input type="number" id="sc-y" value="10" style="width:65px;">
       <span style="font-size:13px;color:var(--t2);">배당률(%)</span><input type="number" id="sc-d" value="7" step="0.5" style="width:65px;">
-      <button class="btn" onclick="calcSC()">계산</button>
+      <button class="btn" onclick="calcSC();renderSCChart()">계산</button>
     </div>
     <div style="display:grid;grid-template-columns:65px 140px 1fr 120px 120px 75px;gap:6px;padding:7px 0;border-bottom:1px solid var(--border);">
       <div style="font-size:10px;color:var(--t3);">수익률</div><div style="font-size:10px;color:var(--t3);">ISA 자산</div>
@@ -284,15 +257,15 @@ input[type=number]{text-align:left;}
     </div>
     <div id="sc-rows"></div>
   </div>
-  <div class="sec mb">직투 성장 시나리오</div>
-  <div class="card"><div style="position:relative;height:260px;"><canvas id="c-sc" role="img" aria-label="직투성장">직투성장</canvas></div>
+  <div class="sec mb">ISA 성장 시나리오</div>
+  <div class="card"><div style="position:relative;height:260px;"><canvas id="c-sc" role="img" aria-label="ISA성장">ISA성장</canvas></div>
     <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;" id="sc-leg"></div>
   </div>
 </div>
 
-<!-- 일일변동 -->
+<!-- 수량입력 -->
 <div class="pg" id="pg-dy">
-  <div class="sec mb">수량 변경 (일일변동)</div>
+  <div class="sec mb">수량 입력</div>
   <div style="display:flex;gap:8px;margin-bottom:14px;">
     <button class="btn" onclick="saveDY()">Firebase 저장</button>
     <button class="btn rd sm" onclick="resetDY()">기본값 복원</button>
@@ -414,6 +387,8 @@ const DEF_LOG=[
 let H=JSON.parse(localStorage.getItem('ttg_h3')||'null')||JSON.parse(JSON.stringify(DEF_H));
 let LOG=JSON.parse(localStorage.getItem('ttg_log4')||'null')||JSON.parse(JSON.stringify(DEF_LOG));
 let RT=JSON.parse(localStorage.getItem('ttg_rt3')||'null')||{fx:1504.77,pri:524313920};
+let OV_SORT={key:'value',dir:'desc'};
+let RT_SORT={key:'value',dir:'desc'};
 
 const fmtO=v=>{const a=Math.floor(v/1e8),m=Math.round((v%1e8)/1e4);return a>0&&m>0?`${a}억 ${m.toLocaleString()}만`:(a>0?`${a}억`:`${m.toLocaleString()}만원`);};
 const fmtW=v=>Math.round(v).toLocaleString();
@@ -421,6 +396,33 @@ const fmtM=v=>Math.round(v/1e4).toLocaleString()+'만';
 const val=(h,fx)=>h.c==='USD'?h.p*h.q*fx:h.p*h.q;
 const byType=(t,fx)=>H.filter(h=>h.t===t).reduce((s,h)=>s+val(h,fx),0);
 const grand=(fx)=>H.reduce((s,h)=>s+val(h,fx),0);
+
+const isWife=h=>String(h.a||'').includes('와이프');
+const isChild=h=>String(h.a||'').includes('나율')||String(h.a||'').includes('다윤');
+function currentIsaTotal(){const fx=RT.fx||1504.77;return H.filter(h=>h.t==='i').reduce((s,h)=>s+val(h,fx),0);}
+function paddedScale(values,pad=5e7){
+  const nums=(values||[]).map(Number).filter(v=>Number.isFinite(v));
+  if(!nums.length)return {};
+  const mn=Math.min(...nums), mx=Math.max(...nums);
+  return {min:Math.max(0,mn-pad),max:mx+pad};
+}
+function sortedHoldings(rows,total,sort){
+  const key=sort?.key||'value', dir=sort?.dir||'desc', fx=RT.fx||1504.77;
+  return [...rows].map(h=>({...h,_v:val(h,fx),_pct:total?val(h,fx)/total*100:0})).sort((a,b)=>{
+    const av=key==='pct'?a._pct:a._v, bv=key==='pct'?b._pct:b._v;
+    return dir==='asc'?av-bv:bv-av;
+  });
+}
+function setOVSort(key,dir){OV_SORT={key,dir};const e=document.getElementById('ov-sort-label');if(e)e.textContent=(key==='pct'?'비중':'평가액')+' '+(dir==='asc'?'오름차순':'내림차순');renderOV();}
+function setRTSort(key,dir){RT_SORT={key,dir};const e=document.getElementById('rt-sort-label');if(e)e.textContent='평가액 '+(dir==='asc'?'오름차순':'내림차순');renderRT();}
+function getPrincipalBaseForToday(today){
+  const todayLog=LOG.find(l=>String(l.date)===today);
+  if(todayLog && Number.isFinite(Number(todayLog.principal)))return Number(todayLog.principal)-Number(todayLog.added||0);
+  const prev=[...LOG].filter(l=>String(l.date)<today && Number.isFinite(Number(l.principal))).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];
+  if(prev)return Number(prev.principal);
+  return Number(RT.pri)||524313920;
+}
+
 
 function todayStr(){return new Date().toISOString().slice(0,10);}
 function getPrevLogForCompare(){
@@ -640,7 +642,7 @@ async function startAutoRefresh(){
   setInterval(()=>refreshPrices(true),15*60*1000);
 }
 
-function renderAll(){renderOV();renderRT();renderLG();renderLogChart();if(document.getElementById('pg-dy').classList.contains('on'))renderDY();}
+function renderAll(){renderOV();renderRT();renderLG();renderLogChart();if(document.getElementById('pg-sc')?.classList.contains('on')){calcSC();renderSCChart();}if(document.getElementById('pg-dy').classList.contains('on'))renderDY();}
 
 let charts={};
 function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
@@ -649,7 +651,7 @@ function sp(id){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   document.getElementById('pg-'+id).classList.add('on');
-  const map={ov:'개요',rt:'실시간',lg:'자산LOG',sc:'시나리오',dy:'일일변동'};
+  const map={ov:'개요',rt:'실시간',lg:'자산LOG',sc:'시나리오',dy:'수량입력'};
   document.querySelectorAll('.tab').forEach(t=>{if(t.textContent===map[id])t.classList.add('on');});
   if(id==='ov')renderOV();
   if(id==='rt')renderRT();
@@ -660,16 +662,18 @@ function sp(id){
 
 function renderHoldingsGroup(tbodyId,subId,pctId,types,total,fx){
   const tb=document.getElementById(tbodyId);if(!tb)return;tb.innerHTML='';let sub=0;
-  H.filter(h=>types.includes(h.t)).forEach(h=>{
-    const v=val(h,fx);sub+=v;
+  const rows=sortedHoldings(H.filter(h=>types.includes(h.t)),total,OV_SORT);
+  rows.forEach(h=>{
+    const v=h._v;sub+=v;
     const pr=h.c==='USD'?'$'+h.p.toLocaleString(undefined,{maximumFractionDigits:2}):'₩'+h.p.toLocaleString();
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td class="nm" style="font-size:12px;">${h.a}</td><td class="nm" style="font-size:12px;">${h.e}</td><td><span class="tk ${h.cl}">${h.tk}</span></td><td>${h.q.toLocaleString()}</td><td style="color:var(--ac);font-size:12px;">${pr}</td><td class="ac">${fmtM(v)}</td><td style="font-size:11px;color:var(--t2);">${h.r||(v/total*100).toFixed(1)+'%'}</td>`;
+    tr.innerHTML=`<td><span class="tk ${h.cl}">${h.tk}</span></td><td>${h.q.toLocaleString()}</td><td style="color:var(--ac);font-size:12px;">${pr}</td><td class="ac">${fmtM(v)}</td><td style="font-size:11px;color:var(--t2);">${(v/total*100).toFixed(2)}%</td>`;
     tb.appendChild(tr);
   });
   const se=document.getElementById(subId);if(se)se.textContent='₩'+fmtW(sub);
   const pe=document.getElementById(pctId);if(pe)pe.textContent=(sub/total*100).toFixed(1)+'%';
 }
+
 
 function renderOV(){
   const fx=RT.fx||1504.77;
@@ -690,10 +694,12 @@ function renderOV(){
   dc('trend');
   const trendLog=getLiveTrendLog(tot,pri);
   if(trendLog.length>0){
+    const trendVals=trendLog.map(l=>l.asset);
+    const trendScale=paddedScale(trendVals,5e7);
     charts['trend']=new Chart(document.getElementById('c-trend'),{type:'line',
-      data:{labels:trendLog.map(l=>l.date.slice(5)),datasets:[{data:trendLog.map(l=>l.asset),borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.5,pointRadius:1,tension:0.4}]},
+      data:{labels:trendLog.map(l=>l.date.slice(5)),datasets:[{data:trendVals,borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.5,pointRadius:1,tension:0.4}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.parsed.y/1e8).toFixed(2)+'억'}}},
-      scales:{x:{ticks:{font:{size:10},color:'#484f58',maxTicksLimit:10},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{callback:v=>(v/1e8).toFixed(1)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
+      scales:{x:{ticks:{font:{size:10},color:'#484f58',maxTicksLimit:10},grid:{color:'rgba(255,255,255,0.03)'}},y:{...trendScale,ticks:{callback:v=>(v/1e8).toFixed(1)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
   }
   const st={qm:0,ql:0,sp:0,sg:0};H.forEach(h=>{st[h.cl]+=val(h,fx);});
   const stot=Object.values(st).reduce((a,b)=>a+b,0);
@@ -705,14 +711,19 @@ function renderOV(){
     options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+(c.parsed/stot*100).toFixed(1)+'%'}}}}});
   const leg=document.getElementById('strat-leg');if(leg){leg.innerHTML='';Object.keys(st).forEach(k=>{leg.innerHTML+=`<span style="font-size:11px;color:var(--t2);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:2px;background:${clrs[k]};display:inline-block;"></span>${lbs[k]} ${(st[k]/stot*100).toFixed(1)}%</span>`;});}
   const accts=[
-    {l:'직투',v:byType('d',fx)},{l:'삼성DC',v:H.filter(h=>h.a==='삼성 DC').reduce((s,h)=>s+val(h,fx),0)},
-    {l:'와이프직투',v:H.filter(h=>h.a==='와이프 삼성').reduce((s,h)=>s+val(h,fx),0)},
-    {l:'ISA',v:byType('i',fx)},{l:'자녀',v:H.filter(h=>h.a==='나율 삼성'||h.a==='다윤 삼성').reduce((s,h)=>s+val(h,fx),0)},
-    {l:'RSA',v:byType('r',fx)},{l:'IRP',v:H.filter(h=>h.a==='나무 IRP').reduce((s,h)=>s+val(h,fx),0)},
-  ];
+    {l:'직투',v:H.filter(h=>h.t==='d'&&!isWife(h)&&!isChild(h)).reduce((s,h)=>s+val(h,fx),0)},
+    {l:'와이프직투',v:H.filter(h=>h.t==='d'&&isWife(h)).reduce((s,h)=>s+val(h,fx),0)},
+    {l:'ISA',v:H.filter(h=>h.t==='i'&&!isWife(h)).reduce((s,h)=>s+val(h,fx),0)},
+    {l:'RSA',v:H.filter(h=>h.t==='r'&&!isWife(h)).reduce((s,h)=>s+val(h,fx),0)},
+    {l:'IRP',v:H.filter(h=>h.t==='p'&&!isWife(h)).reduce((s,h)=>s+val(h,fx),0)},
+    {l:'와이프ISA',v:H.filter(h=>h.t==='i'&&isWife(h)).reduce((s,h)=>s+val(h,fx),0)},
+    {l:'와이프RSA',v:H.filter(h=>h.t==='r'&&isWife(h)).reduce((s,h)=>s+val(h,fx),0)},
+    {l:'와이프IRP',v:H.filter(h=>h.t==='p'&&isWife(h)).reduce((s,h)=>s+val(h,fx),0)},
+    {l:'자녀',v:H.filter(h=>isChild(h)).reduce((s,h)=>s+val(h,fx),0)},
+  ].filter(a=>a.v>0);
   dc('acct');
   charts['acct']=new Chart(document.getElementById('c-acct'),{type:'bar',
-    data:{labels:accts.map(a=>a.l),datasets:[{data:accts.map(a=>a.v),backgroundColor:['#3b82f6','#f59e0b','#60a5fa','#00d4aa','#a855f7','#ec4899','#64748b'],borderRadius:3}]},
+    data:{labels:accts.map(a=>a.l),datasets:[{data:accts.map(a=>a.v),backgroundColor:['#3b82f6','#60a5fa','#00d4aa','#a855f7','#f59e0b','#14b8a6','#ec4899','#64748b','#8b5cf6'],borderRadius:3}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.parsed.x/1e8).toFixed(2)+'억'}}},
     scales:{x:{ticks:{callback:v=>(v/1e8).toFixed(0)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{font:{size:11},color:'#8b949e'},grid:{display:false}}}}});
 
@@ -734,8 +745,8 @@ function renderRT(){
   const ad=tot-ATH;const ae=document.getElementById('rt-ath');
   if(ae){ae.textContent=(ad>=0?'+':'')+fmtM(ad);ae.className='mv sm '+(ad>=0?'gn':'rd');}
   const tb=document.getElementById('rt-tbody');if(!tb)return;tb.innerHTML='';
-  H.forEach(h=>{
-    const v=val(h,fx);
+  sortedHoldings(H,tot,RT_SORT).forEach(h=>{
+    const v=h._v;
     const pr=h.c==='USD'?'$'+h.p.toLocaleString(undefined,{maximumFractionDigits:2}):'₩'+h.p.toLocaleString();
     const tr=document.createElement('tr');
     tr.innerHTML=`<td class="nm" style="font-size:12px;">${h.a}</td><td class="nm" style="font-size:12px;">${h.e}</td><td><span class="tk ${h.cl}">${h.tk}</span></td><td style="color:var(--ac);">${pr}</td><td>${h.q.toLocaleString()}</td><td class="ac">${fmtM(v)}</td>`;
@@ -750,14 +761,20 @@ function calcRT(){renderRT();}
 async function saveLogNow(){
   const fx=RT.fx;const tot=grand(fx);
   const d=new Date().toISOString().slice(0,10);
-  const pri=RT.pri||524313920;
-  const entry={date:d,asset:Math.round(tot),principal:pri,added:0};
+  const addEl=document.getElementById('lg-add');
+  const added=Math.max(0,Math.round(parseFloat(addEl?.value)||0));
+  const base=getPrincipalBaseForToday(d);
+  const pri=Math.round(base+added);
+  RT.pri=pri;
+  localStorage.setItem('ttg_rt3',JSON.stringify(RT));
+  const entry={date:d,asset:Math.round(tot),principal:pri,added};
   LOG=LOG.filter(l=>l.date!==d);LOG.push(entry);LOG.sort((a,b)=>a.date.localeCompare(b.date));
   localStorage.setItem('ttg_log4',JSON.stringify(LOG));
   const ok=await fbSave('log',d.replace(/-/g,''),entry);
-  toast(ok?'오늘 LOG Firebase 저장 완료':'오늘 LOG 로컬 저장 완료');
-  renderLG();renderLogChart();
+  toast(ok?`오늘 LOG Firebase 저장 완료 · 추가투입 ${fmtM(added)}`:`오늘 LOG 로컬 저장 완료 · 추가투입 ${fmtM(added)}`);
+  renderOV();renderRT();renderLG();renderLogChart();
 }
+
 
 async function addLog(){
   const d=document.getElementById('lg-d').value;
@@ -930,33 +947,37 @@ function renderLG(){
     const i=LOG.length-1-ri;const prev=i>0?LOG[i-1]:null;
     const chg=prev?l.asset-prev.asset:0;const prf=l.asset-l.principal,rt=(prf/l.principal*100);
     const row=document.createElement('div');
-    row.style.cssText='display:grid;grid-template-columns:100px 140px 115px 115px 90px 110px 50px;gap:6px;align-items:center;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,0.03);';
-    row.innerHTML=`<div style="font-family:monospace;font-size:12px;color:var(--t2);">${l.date}</div><div style="font-family:monospace;font-size:12px;color:var(--t1);">${fmtO(l.asset)}</div><div style="font-family:monospace;font-size:11px;color:${chg>=0?'#10b981':'#ef4444'};">${chg===0?'-':(chg>=0?'+':'')+fmtM(chg)}</div><div style="font-family:monospace;font-size:11px;color:#10b981;">+${fmtM(prf)}</div><div style="font-family:monospace;font-size:11px;color:#00d4aa;">+${rt.toFixed(1)}%</div><div style="font-family:monospace;font-size:11px;color:var(--am);">${l.added?'+'+fmtM(l.added):'-'}</div><button class="btn rd sm" onclick="delLog('${l.date}')">삭제</button>`;
+    row.style.cssText='display:grid;grid-template-columns:100px 140px 115px 115px 90px 110px;gap:6px;align-items:center;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,0.03);';
+    row.innerHTML=`<div style="font-family:monospace;font-size:12px;color:var(--t2);">${l.date}</div><div style="font-family:monospace;font-size:12px;color:var(--t1);">${fmtO(l.asset)}</div><div style="font-family:monospace;font-size:11px;color:${chg>=0?'#10b981':'#ef4444'};">${chg===0?'-':(chg>=0?'+':'')+fmtM(chg)}</div><div style="font-family:monospace;font-size:11px;color:${prf>=0?'#10b981':'#ef4444'};">${prf>=0?'+':''}${fmtM(prf)}</div><div style="font-family:monospace;font-size:11px;color:#00d4aa;">${rt>=0?'+':''}${rt.toFixed(1)}%</div><div style="font-family:monospace;font-size:11px;color:var(--am);">${l.added?'+'+fmtM(l.added):'-'}</div>`;
     el.appendChild(row);
   });
-  const la=document.getElementById('lg-a');if(la)la.value=Math.round(grand(RT.fx));
-  const lp=document.getElementById('lg-p');if(lp&&!lp.value)lp.value=RT.pri||524313920;
 }
+
 
 function renderLogChart(){
   dc('log');if(!LOG.length)return;
+  const totalVals=LOG.map(l=>l.asset);
+  const profitVals=LOG.map(l=>l.asset-l.principal);
+  const logScale=paddedScale([...totalVals,...profitVals],5e7);
   charts['log']=new Chart(document.getElementById('c-log'),{type:'line',
     data:{labels:LOG.map(l=>l.date.slice(5)),datasets:[
-      {label:'총 자산',data:LOG.map(l=>l.asset),borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.5,pointRadius:1,tension:0.4},
-      {label:'수익금',data:LOG.map(l=>l.asset-l.principal),borderColor:'#10b981',fill:false,borderWidth:1,pointRadius:0,tension:0.4,borderDash:[4,3]},
+      {label:'총 자산',data:totalVals,borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.5,pointRadius:1,tension:0.4},
+      {label:'수익금',data:profitVals,borderColor:'#10b981',fill:false,borderWidth:1,pointRadius:0,tension:0.4,borderDash:[4,3]},
     ]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.parsed.y/1e8).toFixed(2)+'억'}}},
-    scales:{x:{ticks:{font:{size:10},color:'#484f58',maxTicksLimit:12},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{callback:v=>(v/1e8).toFixed(0)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
+    scales:{x:{ticks:{font:{size:10},color:'#484f58',maxTicksLimit:12},grid:{color:'rgba(255,255,255,0.03)'}},y:{...logScale,ticks:{callback:v=>(v/1e8).toFixed(1)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
 }
 
+
 function calcSC(){
-  const init=parseFloat(document.getElementById('sc-i').value)||84171460;
+  const init=currentIsaTotal();
+  const scCur=document.getElementById('sc-i');if(scCur)scCur.textContent='₩'+fmtW(init);
   const monthly=(parseFloat(document.getElementById('sc-m').value)||200)*10000;
   const years=parseInt(document.getElementById('sc-y').value)||10;
   const divR=(parseFloat(document.getElementById('sc-d').value)||7)/100;
   const pri=init+monthly*12*years;
   const rates=[7,10,15,20,25],colors=['#64748b','#3b82f6','#a855f7','#f59e0b','#ef4444'];
-  function calc(r){let ex=init,nw=0;r=r/100;for(let y=0;y<years;y++){ex*=(1+r);nw=(nw+monthly*12)*(1+r);}return ex+nw;}
+  function calc(r){let asset=init;r=r/100;for(let y=0;y<years;y++){asset=(asset+monthly*12)*(1+r);}return asset;}
   const maxV=calc(25),cont=document.getElementById('sc-rows');cont.innerHTML='';
   rates.forEach((r,ri)=>{
     const tot=calc(r),ann=tot*divR,mon=ann/12,mult=(tot/pri).toFixed(1),pct=(tot/maxV*100).toFixed(0);
@@ -967,18 +988,29 @@ function calcSC(){
   });
 }
 
+
 function renderSCChart(){
-  const base=grand(RT.fx)||384972349;
-  const yrs=Array.from({length:21},(_,i)=>i);
+  const init=currentIsaTotal();
+  const years=parseInt(document.getElementById('sc-y')?.value)||10;
+  const monthly=(parseFloat(document.getElementById('sc-m')?.value)||200)*10000;
+  const yrs=Array.from({length:years+1},(_,i)=>i);
   const rates=[{r:7,c:'#64748b'},{r:10,c:'#3b82f6'},{r:15,c:'#a855f7'},{r:20,c:'#f59e0b'},{r:25,c:'#ef4444'}];
+  function series(r){
+    let asset=init;const out=[asset];r=r/100;
+    for(let y=1;y<=years;y++){asset=(asset+monthly*12)*(1+r);out.push(asset);}return out;
+  }
+  const datasets=rates.map(({r,c})=>({label:r+'%',data:series(r),borderColor:c,backgroundColor:'transparent',borderWidth:1.5,pointRadius:0,tension:0.4}));
+  const allVals=datasets.flatMap(d=>d.data);
+  const scScale=paddedScale(allVals,5e7);
   dc('sc');
   charts['sc']=new Chart(document.getElementById('c-sc'),{type:'line',
-    data:{labels:yrs.map(y=>(40+y)+'세'),datasets:rates.map(({r,c})=>({label:r+'%',data:yrs.map(y=>base*Math.pow(1+r/100,y)),borderColor:c,backgroundColor:'transparent',borderWidth:1.5,pointRadius:0,tension:0.4}))},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y/1e8).toFixed(1)+'억'}}},
-    scales:{x:{ticks:{font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{callback:v=>(v/1e8).toFixed(0)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
+    data:{labels:yrs.map(y=>y===0?'현재':y+'년'),datasets},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y/1e8).toFixed(2)+'억'}}},
+    scales:{x:{ticks:{font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}},y:{...scScale,ticks:{callback:v=>(v/1e8).toFixed(1)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
   const leg=document.getElementById('sc-leg');leg.innerHTML='';
   rates.forEach(({r,c})=>{leg.innerHTML+=`<span style="font-size:12px;color:#8b949e;display:flex;align-items:center;gap:5px;"><span style="width:18px;height:2px;background:${c};display:inline-block;"></span>${r}%</span>`;});
 }
+
 
 function renderDY(){
   const fx=RT.fx||1504.77;
@@ -1003,7 +1035,7 @@ async function saveDY(){
 function resetDY(){if(confirm('기본값으로 복원할까요?')){H=JSON.parse(JSON.stringify(DEF_H));localStorage.setItem('ttg_h3',JSON.stringify(H));renderDY();renderOV();toast('기본값 복원 완료');}}
 
 // INIT
-document.getElementById('lg-d').valueAsDate=new Date();
+const _lgd=document.getElementById('lg-d');if(_lgd)_lgd.valueAsDate=new Date();
 window.addEventListener('fbready',fbLoad);
 if(window._fbReady)fbLoad();
 else{setTimeout(()=>{if(!window._fbReady){renderAll();startAutoRefresh();}},2000);}
