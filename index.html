@@ -422,14 +422,35 @@ const val=(h,fx)=>h.c==='USD'?h.p*h.q*fx:h.p*h.q;
 const byType=(t,fx)=>H.filter(h=>h.t===t).reduce((s,h)=>s+val(h,fx),0);
 const grand=(fx)=>H.reduce((s,h)=>s+val(h,fx),0);
 
+function todayStr(){return new Date().toISOString().slice(0,10);}
+function getPrevLogForCompare(){
+  if(!LOG.length)return null;
+  const today=todayStr();
+  const sorted=[...LOG].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const beforeToday=sorted.filter(l=>String(l.date)<today);
+  if(beforeToday.length)return beforeToday[beforeToday.length-1];
+  return sorted.length>1?sorted[sorted.length-2]:sorted[0];
+}
+function getLiveTrendLog(tot,pri){
+  const today=todayStr();
+  const arr=[...LOG].filter(l=>l&&l.date).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const live={date:today,asset:Math.round(tot),principal:Math.round(pri),added:0,live:true};
+  const idx=arr.findIndex(l=>String(l.date)===today);
+  if(idx>=0)arr[idx]={...arr[idx],asset:live.asset,principal:live.principal,live:true};
+  else arr.push(live);
+  return arr;
+}
+
 function toast(msg,err=false){const w=document.getElementById('tw');const d=document.createElement('div');d.className='toast'+(err?' err':'');d.textContent=msg;w.appendChild(d);setTimeout(()=>d.remove(),3000);}
 
-async function fetchFX(){
+async function fetchFX(updateScreen=true){
   try{
     const r=await fetch('https://api.exchangerate-api.com/v4/latest/USD');
     const data=await r.json();
     RT.fx=data.rates.KRW;
+    localStorage.setItem('ttg_rt3',JSON.stringify(RT));
     ['ov-fx','rt-fx'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=RT.fx.toLocaleString(undefined,{maximumFractionDigits:2});});
+    if(updateScreen){renderOV();renderRT();if(document.getElementById('pg-dy')?.classList.contains('on'))renderDY();}
     return RT.fx;
   }catch(e){return RT.fx;}
 }
@@ -443,9 +464,10 @@ async function fetchPrice(sym){
   }catch(e){return null;}
 }
 
-async function refreshPrices(){
-  document.getElementById('rspin').style.display='inline-block';
-  const fx=await fetchFX();
+async function refreshPrices(silent=false){
+  const spin=document.getElementById('rspin');
+  if(spin)spin.style.display='inline-block';
+  const fx=await fetchFX(false);
   const usSym=[...new Set(H.filter(h=>h.sym).map(h=>h.sym))];
   const krSym=[...new Set(H.filter(h=>h.krx).map(h=>h.krx))];
   const pm={};
@@ -455,13 +477,13 @@ async function refreshPrices(){
   ]);
   H.forEach(h=>{const k=h.sym||h.krx;if(k&&pm[k])h.p=pm[k];});
   const now=new Date().toLocaleTimeString('ko-KR');
-  document.getElementById('lu').textContent=now+' 업데이트';
-  document.getElementById('rt-last').textContent=now;
-  document.getElementById('rspin').style.display='none';
+  const lu=document.getElementById('lu');if(lu)lu.textContent=now+' 자동 업데이트';
+  const rtLast=document.getElementById('rt-last');if(rtLast)rtLast.textContent=now;
+  if(spin)spin.style.display='none';
   localStorage.setItem('ttg_h3',JSON.stringify(H));
-  calcRT();renderOV();
-  if(document.getElementById('pg-dy').classList.contains('on'))renderDY();
-  toast('시세 업데이트 완료 (15분 지연)');
+  localStorage.setItem('ttg_rt3',JSON.stringify(RT));
+  renderAll();
+  if(!silent)toast('시세 업데이트 완료 (15분 지연)');
 }
 
 async function fbSave(col,id,data){
@@ -481,6 +503,16 @@ async function fbLoad(){
     toast('Firebase 로드 완료');
   }catch(e){document.getElementById('sync-dot').className='sync-dot';}
   renderAll();
+  startAutoRefresh();
+}
+
+let autoStarted=false;
+async function startAutoRefresh(){
+  if(autoStarted)return;
+  autoStarted=true;
+  await refreshPrices(true);
+  setInterval(()=>fetchFX(true),5*60*1000);
+  setInterval(()=>refreshPrices(true),15*60*1000);
 }
 
 function renderAll(){renderOV();renderRT();renderLG();renderLogChart();if(document.getElementById('pg-dy').classList.contains('on'))renderDY();}
@@ -517,7 +549,7 @@ function renderHoldingsGroup(tbodyId,subId,pctId,types,total,fx){
 function renderOV(){
   const fx=RT.fx||1504.77;
   const tot=grand(fx),pri=RT.pri||524313920,prf=tot-pri,rt=(prf/pri*100);
-  const prev=LOG.length>1?LOG[LOG.length-2]:null;
+  const prev=getPrevLogForCompare();
   const chg=prev?tot-prev.asset:0;
   const se=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
   se('ov-tot',fmtO(tot));se('ov-totr','₩'+fmtW(tot));
@@ -531,11 +563,12 @@ function renderOV(){
   sp2('pp-d','pf-d',d);sp2('pp-dc','pf-dc',dc2);sp2('pp-i','pf-i',isa);sp2('pp-r','pf-r',rsa);
 
   dc('trend');
-  if(LOG.length>0){
+  const trendLog=getLiveTrendLog(tot,pri);
+  if(trendLog.length>0){
     charts['trend']=new Chart(document.getElementById('c-trend'),{type:'line',
-      data:{labels:LOG.map(l=>l.date.slice(5)),datasets:[{data:LOG.map(l=>l.asset),borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.5,pointRadius:1,tension:0.4}]},
+      data:{labels:trendLog.map(l=>l.date.slice(5)),datasets:[{data:trendLog.map(l=>l.asset),borderColor:'#00d4aa',backgroundColor:'rgba(0,212,170,0.05)',fill:true,borderWidth:1.5,pointRadius:1,tension:0.4}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.parsed.y/1e8).toFixed(2)+'억'}}},
-      scales:{x:{ticks:{font:{size:10},color:'#484f58',maxTicksLimit:10},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{callback:v=>(v/1e8).toFixed(0)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
+      scales:{x:{ticks:{font:{size:10},color:'#484f58',maxTicksLimit:10},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{callback:v=>(v/1e8).toFixed(1)+'억',font:{size:10},color:'#484f58'},grid:{color:'rgba(255,255,255,0.03)'}}}}});
   }
   const st={qm:0,ql:0,sp:0,sg:0};H.forEach(h=>{st[h.cl]+=val(h,fx);});
   const stot=Object.values(st).reduce((a,b)=>a+b,0);
@@ -566,7 +599,7 @@ function renderOV(){
 function renderRT(){
   const fx=RT.fx||1504.77;
   const tot=grand(fx),pri=RT.pri||524313920,prf=tot-pri,rt=(prf/pri*100);
-  const prev=LOG.length>1?LOG[LOG.length-2]:null;
+  const prev=getPrevLogForCompare();
   const chg=prev?tot-prev.asset:0;
   const se=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
   se('rt-tot',fmtO(tot));se('rt-totr','₩'+fmtW(tot));
@@ -848,9 +881,7 @@ function resetDY(){if(confirm('기본값으로 복원할까요?')){H=JSON.parse(
 document.getElementById('lg-d').valueAsDate=new Date();
 window.addEventListener('fbready',fbLoad);
 if(window._fbReady)fbLoad();
-else{setTimeout(()=>{if(!window._fbReady){renderAll();}},2000);}
-fetchFX();
-setInterval(fetchFX,5*60*1000);
+else{setTimeout(()=>{if(!window._fbReady){renderAll();startAutoRefresh();}},2000);}
 </script>
 </body>
 </html>
