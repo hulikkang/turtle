@@ -123,6 +123,26 @@ td.nm{font-family:system-ui,sans-serif;color:var(--t1);font-size:13px;}
 td.ac{color:var(--ac);}td.gn{color:var(--gn);}
 tr:hover td{background:rgba(255,255,255,0.02);}
 tfoot td{border-top:1px solid var(--border);font-weight:700;color:var(--t1);}
+/* Overview holdings tables: fixed, aligned columns */
+.ov-table{table-layout:fixed;width:100%;min-width:900px;}
+.ov-table col.col-acct{width:115px;}
+.ov-table col.col-etf{width:auto;}
+.ov-table col.col-bucket{width:72px;}
+.ov-table col.col-qty{width:105px;}
+.ov-table col.col-price{width:115px;}
+.ov-table col.col-value{width:120px;}
+.ov-table col.col-pct{width:80px;}
+.ov-table th,.ov-table td{height:36px;line-height:1.25;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ov-table th:nth-child(3),.ov-table td.ov-bucket{text-align:center;}
+.ov-table th:nth-child(4),.ov-table th:nth-child(5),.ov-table th:nth-child(6),.ov-table th:nth-child(7),
+.ov-table td.ov-num,.ov-table td.ov-pct{text-align:right;}
+.ov-table td.ov-acct,.ov-table td.ov-etf{font-family:system-ui,sans-serif;color:var(--t1);}
+.ov-table td.ov-etf{color:var(--t2);}
+.ov-table td.ov-num{font-family:monospace;color:var(--t2);}
+.ov-table td.ov-price{color:var(--ac);}
+.ov-table td.ov-value{color:var(--ac);font-weight:700;}
+.ov-table td.ov-pct{font-size:11px;color:var(--t2);}
+.ov-table .tk{min-width:48px;text-align:center;}
 .tk{display:inline-block;font-size:10px;padding:2px 6px;border-radius:3px;font-family:monospace;font-weight:700;}
 .tk.qm{background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.2);color:#00d4aa;}
 .tk.ql{background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);color:#60a5fa;}
@@ -265,7 +285,7 @@ input[type=number]{text-align:left;}
     <span class="lu" id="ov-sort-direct-label">평가액 내림차순</span>
   </div>
   <div class="card mb">
-    <table><thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
+    <table class="ov-table"><colgroup><col class="col-acct"><col class="col-etf"><col class="col-bucket"><col class="col-qty"><col class="col-price"><col class="col-value"><col class="col-pct"></colgroup><thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
     <tbody id="ov-direct"></tbody>
     <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="ov-ds">-</td><td class="gn" id="ov-dp">-</td></tr></tfoot>
     </table>
@@ -280,7 +300,7 @@ input[type=number]{text-align:left;}
     <span class="lu" id="ov-sort-isa-label">평가액 내림차순</span>
   </div>
   <div class="card mb">
-    <table><thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
+    <table class="ov-table"><colgroup><col class="col-acct"><col class="col-etf"><col class="col-bucket"><col class="col-qty"><col class="col-price"><col class="col-value"><col class="col-pct"></colgroup><thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
     <tbody id="ov-isa"></tbody>
     <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="ov-is">-</td><td style="color:var(--ac);font-size:11px;" id="ov-ip">-</td></tr></tfoot>
     </table>
@@ -295,7 +315,7 @@ input[type=number]{text-align:left;}
     <span class="lu" id="ov-sort-pen-label">평가액 내림차순</span>
   </div>
   <div class="card">
-    <table><thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
+    <table class="ov-table"><colgroup><col class="col-acct"><col class="col-etf"><col class="col-bucket"><col class="col-qty"><col class="col-price"><col class="col-value"><col class="col-pct"></colgroup><thead><tr><th>계좌</th><th>ETF명</th><th>구분</th><th>수량</th><th>현재가</th><th>평가액</th><th>비중</th></tr></thead>
     <tbody id="ov-pen"></tbody>
     <tfoot><tr><td colspan="5" class="nm">소계</td><td class="ac" id="ov-ps">-</td><td style="color:var(--am);font-size:11px;" id="ov-pp">-</td></tr></tfoot>
     </table>
@@ -694,13 +714,15 @@ function renderHoldingsGroup(tbodyId,subId,pctId,types,total,fx,sortGroup){
   const rows=sortedHoldings(H.filter(h=>types.includes(h.t)),total,OV_SORTS[sortGroup]||{key:'value',dir:'desc'});
   rows.forEach(h=>{
     const v=h._v;sub+=v;
-    const pr=h.c==='USD'?'$'+h.p.toLocaleString(undefined,{maximumFractionDigits:2}):'₩'+h.p.toLocaleString();
+    const pr=h.c==='USD'?'$'+Number(h.p||0).toLocaleString(undefined,{maximumFractionDigits:2}):'₩'+Number(h.p||0).toLocaleString();
+    const qty=Number(h.q||0).toLocaleString(undefined,{maximumFractionDigits:4});
+    const pct=total?((v/total*100).toFixed(2)+'%'):'-';
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td class="nm">${h.a}</td><td class="nm">${h.e}</td><td><span class="tk ${h.cl}">${h.tk}</span></td><td>${h.q.toLocaleString()}</td><td style="color:var(--ac);font-size:12px;">${pr}</td><td class="ac">${fmtM(v)}</td><td style="font-size:11px;color:var(--t2);">${(v/total*100).toFixed(2)}%</td>`;
+    tr.innerHTML=`<td class="ov-acct" title="${h.a}">${h.a}</td><td class="ov-etf" title="${h.e}">${h.e}</td><td class="ov-bucket"><span class="tk ${h.cl}">${h.tk}</span></td><td class="ov-num">${qty}</td><td class="ov-num ov-price">${pr}</td><td class="ov-num ov-value">${fmtM(v)}</td><td class="ov-pct">${pct}</td>`;
     tb.appendChild(tr);
   });
   const se=document.getElementById(subId);if(se)se.textContent='₩'+fmtW(sub);
-  const pe=document.getElementById(pctId);if(pe)pe.textContent=(sub/total*100).toFixed(1)+'%';
+  const pe=document.getElementById(pctId);if(pe)pe.textContent=total?(sub/total*100).toFixed(1)+'%':'-';
 }
 
 function renderOV(){
