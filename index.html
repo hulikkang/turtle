@@ -235,7 +235,7 @@ input[type=number]{text-align:left;}
     <div class="card"><div class="ct">수익금</div><div class="mv gn" id="ov-prf">-</div><div class="ms" id="ov-rt">-</div></div>
     <div class="card"><div class="ct">올해 추가투입</div><div class="mv sm" id="ov-year-add" style="color:var(--am);">-</div><div class="ms" id="ov-year-label">-</div></div>
     <div class="card"><div class="ct">USD/KRW</div><div class="mv sm" id="ov-fx"><span class="spinner"></span></div><div class="ms">Yahoo FX 1m 우선</div></div>
-    <div class="card"><div class="ct">ATH</div><div class="mv sm" style="color:var(--am);">6.44억</div><div class="ms">643,675,581 · 26.05.22</div></div>
+    <div class="card"><div class="ct">ATH</div><div class="mv sm" id="ov-ath" style="color:var(--am);">-</div><div class="ms" id="ov-ath-date">LOG 기준</div></div>
   </div>
   <div class="g21">
     <div class="card">
@@ -325,7 +325,7 @@ input[type=number]{text-align:left;}
     <div class="card"><div class="ct">전일 대비</div><div class="mv" id="rt-chg">-</div><div class="ms" id="rt-chgp">-</div></div>
     <div class="card"><div class="ct">수익금</div><div class="mv gn" id="rt-prf">-</div><div class="ms" id="rt-rtp">-</div></div>
     <div class="card"><div class="ct">USD/KRW (자동)</div><div class="mv sm" id="rt-fx"><span class="spinner"></span></div><div class="ms">Yahoo FX 1m 우선</div></div>
-    <div class="card"><div class="ct">ATH 대비</div><div class="mv sm" id="rt-ath">-</div><div class="ms">643,675,581</div></div>
+    <div class="card"><div class="ct">ATH 대비</div><div class="mv sm" id="rt-ath">-</div><div class="ms" id="rt-ath-base">LOG 기준</div></div>
   </div>
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
     <button class="btn" onclick="refreshPrices()"><span class="spinner" id="rspin" style="display:none;"></span> 시세 새로고침</button>
@@ -420,7 +420,6 @@ input[type=number]{text-align:left;}
 </div>
 
 <script>
-const ATH=643675581;
 const DEF_H=[
   {t:'d',a:'메리츠',e:'iShares 0-3M Treasury (SGOV)',tk:'SGOV',cl:'sg',sym:'SGOV',krx:'',p:100.63,q:293,c:'USD',r:''},
   {t:'d',a:'메리츠',e:'SPDR S&P500 (SPYM)',tk:'SPYM',cl:'sp',sym:'SPYM',krx:'',p:87.75,q:218,c:'USD',r:''},
@@ -536,6 +535,27 @@ const fmtM=v=>Math.round(v/1e4).toLocaleString()+'만';
 const val=(h,fx)=>h.c==='USD'?h.p*h.q*fx:h.p*h.q;
 const byType=(t,fx)=>H.filter(h=>h.t===t).reduce((s,h)=>s+val(h,fx),0);
 const grand=(fx)=>H.reduce((s,h)=>s+val(h,fx),0);
+
+function isValidLogAsset(l){
+  const a=Number(l?.asset);
+  return l && l.date && Number.isFinite(a) && a>10000000;
+}
+function getAthEntry(){
+  const rows=[...LOG].filter(isValidLogAsset).sort((a,b)=>Number(b.asset)-Number(a.asset));
+  return rows[0]||null;
+}
+function fmtShortDate(d){
+  const s=String(d||'');
+  const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m?`${m[1].slice(2)}.${m[2]}.${m[3]}`:s;
+}
+function syncPrincipalFromLog(){
+  const rows=[...LOG].filter(l=>l&&l.date&&Number.isFinite(Number(l.principal))&&Number(l.principal)>0).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  if(rows.length){
+    RT.pri=Number(rows[rows.length-1].principal);
+    localStorage.setItem('ttg_rt3',JSON.stringify(RT));
+  }
+}
 
 const isWife=h=>String(h.a||'').includes('와이프');
 const isChild=h=>String(h.a||'').includes('나율')||String(h.a||'').includes('다윤');
@@ -854,21 +874,30 @@ async function fetchStooqPrice(sym){
   }catch(e){}
   return null;
 }
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+async function preferredPrice(primaryFn,fallbackFns=[],waitMs=1600){
+  try{
+    const primary=primaryFn();
+    const fast=await Promise.race([primary, delay(waitMs).then(()=>null)]);
+    if(fast&&fast.price)return fast;
+    const fallback=await firstSuccessful(fallbackFns);
+    if(fallback&&fallback.price)return fallback;
+    const late=await primary.catch(()=>null);
+    return late&&late.price?late:null;
+  }catch(e){
+    return await firstSuccessful(fallbackFns);
+  }
+}
 async function fetchPrice(sym){
   if(/^\d{6}\.(KS|KQ)$/i.test(sym)){
     const code=sym.slice(0,6);
-    return await firstSuccessful([
-      ()=>fetchNaverPrice(code),
-      ()=>fetchYahooPrice(sym)
-    ]);
+    return await preferredPrice(()=>fetchNaverPrice(code),[()=>fetchYahooPrice(sym)],1200);
   }
-  return await firstSuccessful([
-    ()=>fetchStooqPrice(sym),
-    ()=>fetchYahooPrice(sym)
-  ]);
+  // 미국 ETF는 Yahoo 1분봉을 우선 사용한다. Stooq는 빠르지만 종종 지연/전일가라서 보조로만 사용.
+  return await preferredPrice(()=>fetchYahooPrice(sym),[()=>fetchStooqPrice(sym)],1700);
 }
 
-async function refreshPrices(silent=false){
+async function refreshPrices(silent=false, saveRemote=false){
   const spin=document.getElementById('rspin');
   if(spin)spin.style.display='inline-block';
 
@@ -907,6 +936,9 @@ async function refreshPrices(silent=false){
 
   localStorage.setItem('ttg_h3',JSON.stringify(H));
   localStorage.setItem('ttg_rt3',JSON.stringify(RT));
+  if(saveRemote && Object.keys(pm).length>0){
+    await fbSaveSilent('config','holdings',{items:H,lastPriceRefresh:new Date().toISOString(),fx:RT.fx,fxSource:RT.fxSource||''});
+  }
   renderAll();
 
   if(!silent){
@@ -925,6 +957,11 @@ async function fbSave(col,id,data){
   try{const{doc,setDoc}=window._fs;await setDoc(doc(window._db,col,id),data);document.getElementById('sync-dot').className='sync-dot ok';return true;}
   catch(e){document.getElementById('sync-dot').className='sync-dot';return false;}
 }
+async function fbSaveSilent(col,id,data){
+  if(!window._fbReady||!window._user)return false;
+  try{const{doc,setDoc}=window._fs;await setDoc(doc(window._db,col,id),data);document.getElementById('sync-dot').className='sync-dot ok';return true;}
+  catch(e){document.getElementById('sync-dot').className='sync-dot';return false;}
+}
 async function fbLoad(){
   if(!window._fbReady||!window._user)return;
   try{
@@ -933,7 +970,9 @@ async function fbLoad(){
     if(hs.exists())H=hs.data().items;
     const ls=await getDocs(query(collection(window._db,'log'),orderBy('date','asc')));
     if(!ls.empty){LOG=[];ls.forEach(d=>LOG.push(d.data()));}
+    syncPrincipalFromLog();
     document.getElementById('sync-dot').className='sync-dot ok';
+    const lu=document.getElementById('lu');if(lu)lu.textContent='Firebase 로드 완료 · 실시간 시세 갱신중...';
     toast('Firebase 로드 완료');
   }catch(e){document.getElementById('sync-dot').className='sync-dot';}
   renderAll();
@@ -944,9 +983,9 @@ let autoStarted=false;
 async function startAutoRefresh(){
   if(autoStarted)return;
   autoStarted=true;
-  await refreshPrices(true);
+  await refreshPrices(true,true);
   setInterval(()=>fetchFX(true),5*60*1000);
-  setInterval(()=>refreshPrices(true),15*60*1000);
+  setInterval(()=>refreshPrices(true,true),15*60*1000);
 }
 
 function renderAll(){renderOV();renderRT();renderLG();renderLogChart();if(document.getElementById('pg-sc')?.classList.contains('on')){calcSC();renderSCChart();}if(document.getElementById('pg-dy').classList.contains('on'))renderDY();}
@@ -1004,6 +1043,9 @@ function renderOV(){
   }else daysText='성장률 0%';
   se('g-pct',pct.toFixed(2)+'%');
   se('g-rem','잔여: '+fmtO(rem)+' · 남은 일수: '+daysText);
+  const ath=getAthEntry();
+  se('ov-ath',ath?fmtO(Number(ath.asset)):'-');
+  se('ov-ath-date',ath?('₩'+fmtW(Number(ath.asset))+' · '+fmtShortDate(ath.date)):'LOG 없음');
   const arc=document.getElementById('g-arc');if(arc){const c=188.5;arc.setAttribute('stroke-dashoffset',(c-c*Math.min(100,pct)/100).toFixed(1));}
   const d=byType('d',fx),dc2=byType('p',fx),isa=byType('i',fx),rsa=byType('r',fx);
   const sp2=(id,pfId,v)=>{se(id,(v/tot*100).toFixed(1)+'%');const e=document.getElementById(pfId);if(e)e.style.width=(v/tot*100).toFixed(1)+'%';};
@@ -1064,8 +1106,11 @@ function renderRT(){
   const ce=document.getElementById('rt-chg');if(ce){ce.textContent=(chg>=0?'+':'')+fmtM(chg);ce.className='mv '+(chg>=0?'gn':'rd');}
   se('rt-chgp',(chg>=0?'▲':'▼')+' '+(prev?Math.abs(chg/prev.asset*100).toFixed(2):0)+'%');
   se('rt-prf','+'+fmtO(prf));se('rt-rtp','+'+rt.toFixed(2)+'%');
-  const ad=tot-ATH;const ae=document.getElementById('rt-ath');
+  const ath=getAthEntry();
+  const athAsset=ath?Number(ath.asset):tot;
+  const ad=tot-athAsset;const ae=document.getElementById('rt-ath');
   if(ae){ae.textContent=(ad>=0?'+':'')+fmtM(ad);ae.className='mv sm '+(ad>=0?'gn':'rd');}
+  se('rt-ath-base',ath?('기준 '+fmtShortDate(ath.date)+' · ₩'+fmtW(athAsset)):'LOG 기준 없음');
   const tb=document.getElementById('rt-tbody');if(!tb)return;tb.innerHTML='';
   sortedHoldings(H,tot,RT_SORT).forEach(h=>{
     const v=h._v;
