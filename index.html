@@ -188,7 +188,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v2.2-isa</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v2.3-isa</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -358,11 +358,12 @@ input[type=number]{text-align:left;}
   <div class="card mb">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
       <span style="font-size:13px;color:var(--t2);">ISA현재</span><span id="sc-i" style="min-width:130px;font-family:monospace;font-size:14px;color:var(--ac);background:var(--bg3);border:1px solid var(--border);padding:6px 8px;border-radius:5px;display:inline-block;">-</span>
-      <span style="font-size:13px;color:var(--t2);">ISA한도(억)</span><input type="number" id="sc-cap" value="2" step="0.1" min="0.1" style="width:75px;">
+      <span style="font-size:13px;color:var(--t2);">잔여납입(만원)</span><input type="number" id="sc-rem" value="14000" step="100" style="width:95px;" title="앞으로 추가로 넣을 수 있는 ISA 원금 한도">
       <span style="font-size:13px;color:var(--t2);">월불입(만원)</span><input type="number" id="sc-m" value="200" style="width:80px;">
       <span style="font-size:13px;color:var(--t2);">기간(년)</span><input type="number" id="sc-y" value="10" style="width:65px;">
       <span style="font-size:13px;color:var(--t2);">배당률(%)</span><input type="number" id="sc-d" value="7" step="0.5" style="width:65px;">
       <button class="btn" onclick="calcSC();renderSCChart()">계산</button>
+      <span class="lu" id="sc-cap-info">잔여납입 기준</span>
     </div>
     <div style="display:grid;grid-template-columns:65px 140px 1fr 120px 120px 75px;gap:6px;padding:7px 0;border-bottom:1px solid var(--border);">
       <div style="font-size:10px;color:var(--t3);">수익률</div><div style="font-size:10px;color:var(--t3);">ISA 자산</div>
@@ -878,57 +879,63 @@ function renderLogChart(){
     y1:{position:'right',ticks:{callback:v=>v.toFixed(0)+'%',font:{size:10},color:'#60a5fa'},grid:{drawOnChartArea:false}}}}});
 }
 
-function projectIsaScenario(ratePct, years, monthly, cap, init){
-  let asset=Number(init)||0;
-  const limit=Number(cap)||0;
-  const months=Math.max(0,Math.round((Number(years)||0)*12));
-  const mr=Math.pow(1+(Number(ratePct)||0)/100,1/12)-1;
-  let contributed=0;
-  const yearly=[asset];
-  for(let m=1;m<=months;m++){
-    let add=0;
-    if(limit>0 && asset<limit && monthly>0){
-      add=Math.min(monthly,Math.max(0,limit-asset));
-    }
-    asset+=add;
-    contributed+=add;
-    asset*=1+mr;
-    if(m%12===0)yearly.push(asset);
-  }
-  return {asset,contributed,base:(Number(init)||0)+contributed,yearly};
-}
-
-function calcSC(){
+function scenarioParams(){
   const init=currentIsaTotal();
+  const monthly=(parseFloat(document.getElementById('sc-m')?.value)||200)*10000;
+  const years=parseInt(document.getElementById('sc-y')?.value)||10;
+  const remaining=(parseFloat(document.getElementById('sc-rem')?.value)||14000)*10000;
+  const divR=(parseFloat(document.getElementById('sc-d')?.value)||7)/100;
+  return {init,monthly,years,remaining,divR};
+}
+function simulateISA(rate){
+  const {init,monthly,years,remaining}=scenarioParams();
+  const months=Math.max(0,years*12);
+  const monthlyRate=Math.pow(1+rate/100,1/12)-1;
+  let asset=init;
+  let left=remaining;
+  let contributed=0;
+  const out=[asset];
+  for(let i=1;i<=months;i++){
+    asset*=1+monthlyRate;
+    const dep=Math.max(0,Math.min(monthly,left));
+    if(dep>0){asset+=dep;left-=dep;contributed+=dep;}
+    if(i%12===0)out.push(asset);
+  }
+  return {asset,contributed,left,series:out};
+}
+function capMonthsText(monthly,remaining){
+  if(!monthly||monthly<=0||!remaining||remaining<=0)return '추가납입 없음';
+  const months=Math.ceil(remaining/monthly);
+  const y=Math.floor(months/12),m=months%12;
+  const parts=[];if(y)parts.push(y+'년');if(m)parts.push(m+'개월');
+  return parts.join(' ')+' 후 한도 도달';
+}
+function calcSC(){
+  const {init,monthly,years,remaining,divR}=scenarioParams();
   const scCur=document.getElementById('sc-i');if(scCur)scCur.textContent='₩'+fmtW(init);
-  const cap=(parseFloat(document.getElementById('sc-cap')?.value)||2)*1e8;
-  const monthly=(parseFloat(document.getElementById('sc-m').value)||200)*10000;
-  const years=parseInt(document.getElementById('sc-y').value)||10;
-  const divR=(parseFloat(document.getElementById('sc-d').value)||7)/100;
+  const info=document.getElementById('sc-cap-info');
+  if(info)info.textContent=`잔여납입 ${fmtM(remaining)} · 월 ${fmtM(monthly)} · ${capMonthsText(monthly,remaining)}`;
   const rates=[7,10,15,20,25],colors=['#64748b','#3b82f6','#a855f7','#f59e0b','#ef4444'];
-  const results=rates.map(r=>({r,...projectIsaScenario(r,years,monthly,cap,init)}));
+  const results=rates.map(r=>({r,...simulateISA(r)}));
   const maxV=Math.max(...results.map(x=>x.asset));
   const cont=document.getElementById('sc-rows');cont.innerHTML='';
   results.forEach((res,ri)=>{
-    const r=res.r,tot=res.asset,ann=tot*divR,mon=ann/12;
-    const mult=res.base>0?(tot/res.base).toFixed(1):'-';
-    const pct=maxV>0?(tot/maxV*100).toFixed(0):0;
+    const tot=res.asset,ann=tot*divR,mon=ann/12;
+    const base=init+res.contributed;
+    const mult=base>0?(tot/base).toFixed(1):'-';
+    const pct=(tot/maxV*100).toFixed(0);
     const row=document.createElement('div');
     row.style.cssText='display:grid;grid-template-columns:65px 140px 1fr 120px 120px 75px;gap:6px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.04);';
-    row.title=`추가납입 ${fmtO(res.contributed)} · ISA 평가액이 ${fmtO(cap)} 도달 시 월불입 중단`;
-    row.innerHTML=`<div style="font-family:monospace;font-weight:700;font-size:14px;color:${colors[ri]};">${r}%</div><div style="font-family:monospace;font-size:12px;color:#e6edf3;">${fmtO(tot)}</div><div><div style="height:4px;background:#21262d;border-radius:2px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${colors[ri]};border-radius:2px;"></div></div></div><div style="font-family:monospace;font-size:12px;color:${colors[ri]};text-align:right;">${fmtO(ann)}</div><div style="font-family:monospace;font-size:13px;font-weight:700;color:${colors[ri]};text-align:right;">${Math.round(mon/1e4).toLocaleString()}만원</div><div style="font-family:monospace;font-size:12px;color:#8b949e;text-align:right;">${mult}배</div>`;
+    row.innerHTML=`<div style="font-family:monospace;font-weight:700;font-size:14px;color:${colors[ri]};">${res.r}%</div><div style="font-family:monospace;font-size:12px;color:#e6edf3;" title="추가납입 ${fmtM(res.contributed)}">${fmtO(tot)}</div><div><div style="height:4px;background:#21262d;border-radius:2px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${colors[ri]};border-radius:2px;"></div></div></div><div style="font-family:monospace;font-size:12px;color:${colors[ri]};text-align:right;">${fmtO(ann)}</div><div style="font-family:monospace;font-size:13px;font-weight:700;color:${colors[ri]};text-align:right;">${Math.round(mon/1e4).toLocaleString()}만원</div><div style="font-family:monospace;font-size:12px;color:#8b949e;text-align:right;">${mult}배</div>`;
     cont.appendChild(row);
   });
 }
 
 function renderSCChart(){
-  const init=currentIsaTotal();
-  const years=parseInt(document.getElementById('sc-y')?.value)||10;
-  const monthly=(parseFloat(document.getElementById('sc-m')?.value)||200)*10000;
-  const cap=(parseFloat(document.getElementById('sc-cap')?.value)||2)*1e8;
+  const {years}=scenarioParams();
   const yrs=Array.from({length:years+1},(_,i)=>i);
   const rates=[{r:7,c:'#64748b'},{r:10,c:'#3b82f6'},{r:15,c:'#a855f7'},{r:20,c:'#f59e0b'},{r:25,c:'#ef4444'}];
-  const datasets=rates.map(({r,c})=>({label:r+'%',data:projectIsaScenario(r,years,monthly,cap,init).yearly,borderColor:c,backgroundColor:'transparent',borderWidth:1.5,pointRadius:0,tension:0.4}));
+  const datasets=rates.map(({r,c})=>({label:r+'%',data:simulateISA(r).series,borderColor:c,backgroundColor:'transparent',borderWidth:1.5,pointRadius:0,tension:0.4}));
   const allVals=datasets.flatMap(d=>d.data);
   const scScale=paddedScale(allVals,5e7);
   dc('sc');
