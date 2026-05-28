@@ -188,7 +188,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v1.9</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v2.0-datefix</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -556,7 +556,14 @@ function sortedHoldings(rows,total,sort){const key=sort?.key||'value',dir=sort?.
 function setOVSort(group,key,dir){if(!OV_SORTS[group])OV_SORTS[group]={key:'value',dir:'desc'};OV_SORTS[group]={key,dir};const e=document.getElementById(`ov-sort-${group}-label`);if(e)e.textContent=(key==='pct'?'비중':'평가액')+' '+(dir==='asc'?'오름차순':'내림차순');renderOV();}
 function setRTSort(key,dir){RT_SORT={key,dir};const e=document.getElementById('rt-sort-label');if(e)e.textContent='평가액 '+(dir==='asc'?'오름차순':'내림차순');renderRT();}
 function getPrincipalBaseForToday(today){const todayLog=LOG.find(l=>String(l.date)===today);if(todayLog&&Number.isFinite(Number(todayLog.principal)))return Number(todayLog.principal)-Number(todayLog.added||0);const prev=[...LOG].filter(l=>String(l.date)<today&&Number.isFinite(Number(l.principal))).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];if(prev)return Number(prev.principal);return Number(RT.pri)||524313920;}
-function todayStr(){return new Date().toISOString().slice(0,10);}
+function todayStr(){
+  // 한국/브라우저 로컬 날짜 기준. toISOString()은 UTC라서 오전 9시 전에는 전날로 찍힐 수 있음.
+  const d=new Date();
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 function getPrevLogForCompare(){if(!LOG.length)return null;const today=todayStr();const sorted=[...LOG].sort((a,b)=>String(a.date).localeCompare(String(b.date)));const beforeToday=sorted.filter(l=>String(l.date)<today);if(beforeToday.length)return beforeToday[beforeToday.length-1];return sorted.length>1?sorted[sorted.length-2]:sorted[0];}
 function getLiveTrendLog(tot,pri){const today=todayStr();const arr=[...LOG].filter(l=>l&&l.date).sort((a,b)=>String(a.date).localeCompare(String(b.date)));const live={date:today,asset:Math.round(tot),principal:Math.round(pri),added:0,live:true};const idx=arr.findIndex(l=>String(l.date)===today);if(idx>=0)arr[idx]={...arr[idx],asset:live.asset,principal:live.principal,live:true};else arr.push(live);return arr;}
 
@@ -813,7 +820,7 @@ async function saveLogNow(){
   await fetchFX(false,false);
   const fx=Number(RT.fx)||1504.77;
   const tot=grand(fx);
-  const d=new Date().toISOString().slice(0,10);
+  const d=todayStr();
   const addEl=document.getElementById('rt-add');
   const added=Math.max(0,Math.round(parseFloat(addEl?.value)||0));
   const base=getPrincipalBaseForToday(d);
