@@ -809,19 +809,39 @@ function renderRT(){
 }
 
 async function saveLogNow(){
-  const fx=RT.fx;const tot=grand(fx);
+  // LOG 저장 직전에 환율을 다시 받아오고, 실패해도 현재 RT.fx 값을 저장한다.
+  await fetchFX(false,false);
+  const fx=Number(RT.fx)||1504.77;
+  const tot=grand(fx);
   const d=new Date().toISOString().slice(0,10);
   const addEl=document.getElementById('rt-add');
   const added=Math.max(0,Math.round(parseFloat(addEl?.value)||0));
   const base=getPrincipalBaseForToday(d);
   const pri=Math.round(base+added);
-  RT.pri=pri;localStorage.setItem('ttg_rt3',JSON.stringify(RT));
-  const entry={date:d,asset:Math.round(tot),principal:pri,added};
-  LOG=LOG.filter(l=>l.date!==d);LOG.push(entry);LOG.sort((a,b)=>a.date.localeCompare(b.date));
+  RT.pri=pri;
+  localStorage.setItem('ttg_rt3',JSON.stringify(RT));
+
+  const entry={
+    date:d,
+    asset:Math.round(tot),
+    principal:pri,
+    added,
+    fx:Math.round(fx*100)/100,
+    fxSource:RT.fxSource||'현재 저장값',
+    fxSavedAt:new Date().toISOString()
+  };
+
+  LOG=LOG.filter(l=>l.date!==d);
+  LOG.push(entry);
+  LOG.sort((a,b)=>a.date.localeCompare(b.date));
   localStorage.setItem('ttg_log4',JSON.stringify(LOG));
   saveLastTotal();
+
   const ok=await fbSave('log',d.replace(/-/g,''),entry);
-  toast(ok?`오늘 LOG Firebase 저장 완료 · 추가투입 ${fmtM(added)}`:`오늘 LOG 로컬 저장 완료`);
+  toast(ok
+    ?`오늘 LOG Firebase 저장 완료 · 환율 ${entry.fx.toLocaleString()} · 추가투입 ${fmtM(added)}`
+    :`오늘 LOG 로컬 저장 완료 · 환율 ${entry.fx.toLocaleString()}`
+  );
   renderOV();renderRT();renderLG();renderLogChart();
 }
 
