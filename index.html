@@ -402,12 +402,13 @@ input[type=number]{text-align:left;}
 <div class="pg" id="pg-lg">
   <div class="sec mb">LOG 히스토리</div>
   <div class="card mb">
-    <div style="display:grid;grid-template-columns:100px 140px 115px 115px 90px 110px;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);">
+    <div style="display:grid;grid-template-columns:100px 140px 115px 115px 90px 100px 110px;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);min-width:780px;">
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">날짜</div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">총 자산</div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">전일대비</div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">수익금</div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">수익률</div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">계산환율</div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;">추가투입</div>
     </div>
     <div id="lg-list"></div>
@@ -872,19 +873,19 @@ function renderRT(){
 }
 
 async function saveLogNow(){
-  const fx=RT.fx;const tot=grand(fx);
+  const fx=Number(RT.fx)||1504.77;const tot=grand(fx);
   const d=new Date().toISOString().slice(0,10);
   const addEl=document.getElementById('rt-add');
   const added=Math.max(0,Math.round(parseFloat(addEl?.value)||0));
   const base=getPrincipalBaseForToday(d);
   const pri=Math.round(base+added);
   RT.pri=pri;localStorage.setItem('ttg_rt3',JSON.stringify(RT));
-  const entry={date:d,asset:Math.round(tot),principal:pri,added};
+  const entry={date:d,asset:Math.round(tot),principal:pri,added,fx:Math.round(fx*100)/100,fxSource:RT.fxSource||'',fxSavedAt:new Date().toISOString()};
   LOG=LOG.filter(l=>l.date!==d);LOG.push(entry);LOG.sort((a,b)=>a.date.localeCompare(b.date));
   localStorage.setItem('ttg_log4',JSON.stringify(LOG));
   saveLastTotal();
   const ok=await fbSave('log',d.replace(/-/g,''),entry);
-  toast(ok?`오늘 LOG Firebase 저장 완료 · 추가투입 ${fmtM(added)}`:`오늘 LOG 로컬 저장 완료`);
+  toast(ok?`오늘 LOG Firebase 저장 완료 · 환율 ${fx.toLocaleString(undefined,{maximumFractionDigits:2})} · 추가투입 ${fmtM(added)}`:`오늘 LOG 로컬 저장 완료 · 환율 ${fx.toLocaleString(undefined,{maximumFractionDigits:2})}`);
   renderOV();renderRT();renderLG();renderLogChart();
 }
 
@@ -894,8 +895,10 @@ function renderLG(){
     const i=LOG.length-1-ri;const prev=i>0?LOG[i-1]:null;
     const chg=prev?l.asset-prev.asset:0;const prf=l.asset-l.principal,rt=(prf/l.principal*100);
     const row=document.createElement('div');
-    row.style.cssText='display:grid;grid-template-columns:100px 140px 115px 115px 90px 110px;gap:6px;align-items:center;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,0.03);';
-    row.innerHTML=`<div style="font-family:monospace;font-size:12px;color:var(--t2);">${l.date}</div><div style="font-family:monospace;font-size:12px;color:var(--t1);">${fmtO(l.asset)}</div><div style="font-family:monospace;font-size:11px;color:${chg>=0?'#10b981':'#ef4444'};">${chg===0?'-':(chg>=0?'+':'')+fmtM(chg)}</div><div style="font-family:monospace;font-size:11px;color:${prf>=0?'#10b981':'#ef4444'};">${prf>=0?'+':''}${fmtM(prf)}</div><div style="font-family:monospace;font-size:11px;color:${rt>=0?'#00d4aa':'#ef4444'};">${rt>=0?'+':''}${rt.toFixed(1)}%</div><div style="font-family:monospace;font-size:11px;color:var(--am);">${l.added?'+'+fmtM(l.added):'-'}</div>`;
+    const fxText=Number(l.fx)?Number(l.fx).toLocaleString(undefined,{maximumFractionDigits:2}):'-';
+    const fxTitle=l.fxSource?` title="${l.fxSource}${l.fxSavedAt?' · '+l.fxSavedAt.slice(11,19):''}"`:'';
+    row.style.cssText='display:grid;grid-template-columns:100px 140px 115px 115px 90px 100px 110px;gap:6px;align-items:center;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,0.03);min-width:780px;';
+    row.innerHTML=`<div style="font-family:monospace;font-size:12px;color:var(--t2);">${l.date}</div><div style="font-family:monospace;font-size:12px;color:var(--t1);">${fmtO(l.asset)}</div><div style="font-family:monospace;font-size:11px;color:${chg>=0?'#10b981':'#ef4444'};">${chg===0?'-':(chg>=0?'+':'')+fmtM(chg)}</div><div style="font-family:monospace;font-size:11px;color:${prf>=0?'#10b981':'#ef4444'};">${prf>=0?'+':''}${fmtM(prf)}</div><div style="font-family:monospace;font-size:11px;color:${rt>=0?'#00d4aa':'#ef4444'};">${rt>=0?'+':''}${rt.toFixed(1)}%</div><div${fxTitle} style="font-family:monospace;font-size:11px;color:var(--t2);">${fxText}</div><div style="font-family:monospace;font-size:11px;color:var(--am);">${l.added?'+'+fmtM(l.added):'-'}</div>`;
     el.appendChild(row);
   });
 }
