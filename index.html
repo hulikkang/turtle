@@ -188,7 +188,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v2.3-isa</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v2.4-stratamt</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -760,8 +760,22 @@ function renderOV(){
   dc('strat');
   charts['strat']=new Chart(document.getElementById('c-strat'),{type:'doughnut',
     data:{labels:Object.keys(st).map(k=>lbs[k]),datasets:[{data:Object.values(st),backgroundColor:Object.keys(st).map(k=>clrs[k]),borderWidth:0,hoverOffset:4}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+(c.parsed/stot*100).toFixed(1)+'%'}}}}});
-  const leg=document.getElementById('strat-leg');if(leg){leg.innerHTML='';Object.keys(st).forEach(k=>{leg.innerHTML+=`<span style="font-size:11px;color:var(--t2);display:flex;align-items:center;gap:4px;"><span style="width:9px;height:9px;border-radius:2px;background:${clrs[k]};display:inline-block;"></span>${lbs[k]} ${(st[k]/stot*100).toFixed(1)}%</span>`;});}
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${fmtO(c.parsed)} (${stot?(c.parsed/stot*100).toFixed(1):'0.0'}%)`}}}}});
+  const leg=document.getElementById('strat-leg');
+  if(leg){
+    leg.innerHTML=`<span style="font-size:11px;color:var(--t2);font-family:monospace;width:100%;margin-bottom:2px;">전략합계: ₩${fmtW(stot)}</span>`;
+    Object.keys(st).forEach(k=>{
+      const pct=stot?(st[k]/stot*100).toFixed(1):'0.0';
+      leg.innerHTML+=`
+        <span style="font-size:11px;color:var(--t2);display:flex;align-items:center;gap:6px;min-width:132px;background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:6px;padding:6px 8px;">
+          <span style="width:9px;height:9px;border-radius:2px;background:${clrs[k]};display:inline-block;flex-shrink:0;"></span>
+          <span style="display:flex;flex-direction:column;gap:2px;line-height:1.25;">
+            <span style="font-family:system-ui,sans-serif;color:var(--t1);font-size:11px;font-weight:700;">${lbs[k]} ${pct}%</span>
+            <span style="font-family:monospace;color:var(--t2);font-size:11px;">${fmtO(st[k])}</span>
+          </span>
+        </span>`;
+    });
+  }
   const accts=[
     {l:'직투',v:H.filter(h=>h.t==='d'&&!isWife(h)&&!isChild(h)).reduce((s,h)=>s+val(h,fx),0)},
     {l:'와이프직투',v:H.filter(h=>h.t==='d'&&isWife(h)).reduce((s,h)=>s+val(h,fx),0)},
