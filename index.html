@@ -214,7 +214,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v3.0</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v2.6</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -673,69 +673,7 @@ async function fetchYahooPrice(sym){for(const s of yahooCandidates(sym)){try{con
 async function fetchStooqPrice(sym){if(/\./.test(sym)||/^\d/.test(sym))return null;try{const txt=await fetchTextNoCache(`https://stooq.com/q/l/?s=${sym.toLowerCase()}.us&f=sd2t2ohlcv&h&e=csv`);if(!txt)return null;const lines=txt.trim().split(/\r?\n/);if(lines.length<2)return null;const cols=lines[1].split(',');const close=parseMoney(cols[6]||cols[4]);if(close&&close>0)return{price:close,prev:close,source:'Stooq',symbol:sym,name:sym};}catch(e){}return null;}
 function delay(ms){return new Promise(r=>setTimeout(r,ms));}
 async function preferredPrice(primaryFn,fallbackFns=[],waitMs=1600){try{const primary=primaryFn();const fast=await Promise.race([primary,delay(waitMs).then(()=>null)]);if(fast&&fast.price)return fast;const fallback=await firstSuccessful(fallbackFns);if(fallback&&fallback.price)return fallback;const late=await primary.catch(()=>null);return late&&late.price?late:null;}catch(e){return await firstSuccessful(fallbackFns);}}
-// ===== KIS Open API 프록시 연동 / 비용 안전 모드 =====
-// KIS appkey/appsecret은 HTML에 절대 넣지 않습니다. Firebase Functions 같은 서버에만 보관합니다.
-// 대시보드는 프록시 URL과 선택적 토큰만 localStorage에 저장합니다.
-function getKisProxyUrl(){ return localStorage.getItem('ttg_kis_proxy_url') || ''; }
-function getKisProxyToken(){ return localStorage.getItem('ttg_kis_proxy_token') || ''; }
-function setKisProxyUrl(url){
-  const v=String(url||'').trim();
-  if(v)localStorage.setItem('ttg_kis_proxy_url',v);
-  else localStorage.removeItem('ttg_kis_proxy_url');
-  toast(v?'KIS 프록시 URL 저장 완료':'KIS 프록시 URL 삭제 완료');
-}
-function setKisProxyToken(token){
-  const v=String(token||'').trim();
-  if(v)localStorage.setItem('ttg_kis_proxy_token',v);
-  else localStorage.removeItem('ttg_kis_proxy_token');
-  toast(v?'KIS 프록시 토큰 저장 완료':'KIS 프록시 토큰 삭제 완료');
-}
-function normalizeKisSymbol(sym){
-  const s=String(sym||'').trim().toUpperCase();
-  const m=s.match(/^(\d{6})\.(KS|KQ)$/);
-  return m?m[1]:s;
-}
-const KIS_CLIENT_CACHE_MS=30000; // 같은 종목 30초 이내 재조회 방지
-let KIS_CLIENT_CACHE={};
-async function fetchKisProxyPrice(sym){
-  const proxy=getKisProxyUrl();
-  if(!proxy)return null;
-  const ns=normalizeKisSymbol(sym);
-  const cached=KIS_CLIENT_CACHE[ns];
-  if(cached && Date.now()-cached.ts<KIS_CLIENT_CACHE_MS){
-    return {...cached.data, source:(cached.data.source||'KIS')+'-CACHE'};
-  }
-  try{
-    const token=getKisProxyToken();
-    const url=proxy+(proxy.includes('?')?'&':'?')+'symbol='+encodeURIComponent(ns);
-    const headers=token?{'x-turtle-token':token}:{};
-    const r=await fetchWithTimeout(url,{cache:'no-store',headers},2600);
-    if(!r.ok)return null;
-    const data=await r.json();
-    const p=parseMoney(data?.price||data?.stck_prpr||data?.last);
-    if(!p||p<=0)return null;
-    const prev=parseMoney(data?.prev||data?.prevClose||data?.stck_sdpr)||p;
-    const out={price:p,prev:prev,source:data?.source||'KIS',symbol:data?.symbol||sym,name:data?.name||sym};
-    KIS_CLIENT_CACHE[ns]={ts:Date.now(),data:out};
-    return out;
-  }catch(e){return null;}
-}
-
-async function fetchPrice(sym){
-  if(/^\d{6}\.(KS|KQ)$/i.test(sym)){
-    const code=sym.slice(0,6);
-    return await preferredPrice(
-      ()=>fetchKisProxyPrice(code),
-      [()=>fetchNaverPrice(code),()=>fetchYahooPrice(sym)],
-      1400
-    );
-  }
-  return await preferredPrice(
-    ()=>fetchKisProxyPrice(sym),
-    [()=>fetchYahooPrice(sym),()=>fetchStooqPrice(sym)],
-    1700
-  );
-}
+async function fetchPrice(sym){if(/^\d{6}\.(KS|KQ)$/i.test(sym)){const code=sym.slice(0,6);return await preferredPrice(()=>fetchNaverPrice(code),[()=>fetchYahooPrice(sym)],1200);}return await preferredPrice(()=>fetchYahooPrice(sym),[()=>fetchStooqPrice(sym)],1700);}
 
 async function refreshPrices(silent=false,saveRemote=false){
   const spin=document.getElementById('rspin');if(spin)spin.style.display='inline-block';
@@ -788,7 +726,7 @@ async function fbLoad(){
 }
 
 let autoStarted=false;
-async function startAutoRefresh(){if(autoStarted)return;autoStarted=true;await refreshPrices(true,false);setInterval(()=>{if(!document.hidden)fetchFX(true);},5*60*1000);setInterval(()=>{if(!document.hidden)refreshPrices(true,false);},15*60*1000);}
+async function startAutoRefresh(){if(autoStarted)return;autoStarted=true;await refreshPrices(true,true);setInterval(()=>fetchFX(true),5*60*1000);setInterval(()=>refreshPrices(true,true),15*60*1000);}
 
 function renderAll(){renderOV();renderRT();renderLG();renderLogChart();if(document.getElementById('pg-sc')?.classList.contains('on')){calcSC();renderSCChart();}if(document.getElementById('pg-dy').classList.contains('on'))renderDY();}
 
