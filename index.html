@@ -214,7 +214,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v2.5</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v2.6</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -890,7 +890,7 @@ function renderRT(){
   se('rt-grand','₩'+fmtW(tot));
 }
 
-async async function saveLogNow(){
+async function saveLogNow(){
   // LOG 저장 직전에 환율을 다시 받아오고, 실패해도 현재 RT.fx 값을 저장한다.
   await fetchFX(false,false);
   const fx=Number(RT.fx)||1504.77;
