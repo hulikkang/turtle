@@ -214,7 +214,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v2.6</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v2.7</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -668,7 +668,27 @@ async function fetchNaverPrice(code){try{
     return{price:p,prev:(prev&&prev>0)?prev:p,source:'Naver',symbol:code,name:data?.stockName||code};
   }
 }catch(e){}return null;}
-function pickYahooPrice(result){if(!result)return null;const meta=result.meta||{};const q=result.indicators?.quote?.[0]||{};const latestCandle=lastFinite(q.close);const state=String(meta.marketState||'').toUpperCase();const candidates=[];if(state.includes('PRE'))candidates.push(meta.preMarketPrice);if(state.includes('POST'))candidates.push(meta.postMarketPrice);candidates.push(meta.regularMarketPrice,latestCandle,meta.postMarketPrice,meta.preMarketPrice,meta.previousClose);for(const x of candidates){const n=Number(x);if(Number.isFinite(n)&&n>0)return{price:n,prev:(Number(meta.previousClose)>0?Number(meta.previousClose):n)};}return null;}
+function pickYahooPrice(result){
+  if(!result)return null;
+  const meta=result.meta||{};
+  const q=result.indicators?.quote?.[0]||{};
+  const latestCandle=lastFinite(q.close);
+  const state=String(meta.marketState||'').toUpperCase();
+  const candidates=[];
+
+  // v2.7: 프리/애프터 포함 최신 1분봉 가격을 정규장 종가보다 우선 사용
+  if(state.includes('PRE'))candidates.push(meta.preMarketPrice);
+  if(state.includes('POST'))candidates.push(meta.postMarketPrice);
+  candidates.push(latestCandle,meta.postMarketPrice,meta.preMarketPrice,meta.regularMarketPrice,meta.previousClose);
+
+  for(const x of candidates){
+    const n=Number(x);
+    if(Number.isFinite(n)&&n>0){
+      return{price:n,prev:(Number(meta.previousClose)>0?Number(meta.previousClose):n)};
+    }
+  }
+  return null;
+}
 async function fetchYahooPrice(sym){for(const s of yahooCandidates(sym)){try{const url=`https://query1.finance.yahoo.com/v8/finance/chart/${s}?interval=1m&range=1d&includePrePost=true`;const data=await fetchJsonNoCache(url);const result=data?.chart?.result?.[0];const picked=pickYahooPrice(result);if(picked&&picked.price>0)return{price:picked.price,prev:picked.prev,source:'Yahoo',symbol:s,name:result?.meta?.longName||result?.meta?.shortName||s};}catch(e){}}return null;}
 async function fetchStooqPrice(sym){if(/\./.test(sym)||/^\d/.test(sym))return null;try{const txt=await fetchTextNoCache(`https://stooq.com/q/l/?s=${sym.toLowerCase()}.us&f=sd2t2ohlcv&h&e=csv`);if(!txt)return null;const lines=txt.trim().split(/\r?\n/);if(lines.length<2)return null;const cols=lines[1].split(',');const close=parseMoney(cols[6]||cols[4]);if(close&&close>0)return{price:close,prev:close,source:'Stooq',symbol:sym,name:sym};}catch(e){}return null;}
 function delay(ms){return new Promise(r=>setTimeout(r,ms));}
