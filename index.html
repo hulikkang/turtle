@@ -214,7 +214,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v3.0</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v3.1</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -421,7 +421,7 @@ input[type=number]{text-align:left;}
   <div class="sec mb">수량 입력</div>
   <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
     <button class="btn" onclick="saveDY()">Firebase 저장</button>
-    <button class="btn sm" onclick="sortDYByAccount()">계좌별 순차정렬</button>
+    <button class="btn sm" onclick="sortDYByAccount()">계좌별 순차정렬(표시)</button>
     <div style="font-size:12px;color:var(--t3);align-self:center;">수량/종목 변경 후 저장하면 실시간/개요에 즉시 반영됩니다</div>
   </div>
   <div class="card">
@@ -542,6 +542,7 @@ let RT=JSON.parse(localStorage.getItem('ttg_rt3')||'null')||{fx:1504.77,pri:5243
 let OV_SORTS={direct:{key:'value',dir:'desc'},isa:{key:'value',dir:'desc'},pen:{key:'value',dir:'desc'}};
 let ASSET_SEARCH=null;
 let RT_SORT={key:'value',dir:'desc'};
+let DY_ACCOUNT_SORT=false; // 수량입력 계좌별 순차정렬은 화면 표시만 정렬하고 원본 H 데이터는 절대 변형하지 않음
 
 const fmtO=v=>{const a=Math.floor(v/1e8),m=Math.round((v%1e8)/1e4);return a>0&&m>0?`${a}억 ${m.toLocaleString()}만`:(a>0?`${a}억`:`${m.toLocaleString()}만원`);};
 const fmtW=v=>Math.round(v).toLocaleString();
@@ -1236,19 +1237,24 @@ async function addAssetFromForm(){
 }
 function deleteAsset(i){const h=H[i];if(!h)return;if(!confirm(`${h.a} / ${h.e} 항목을 삭제할까요?`))return;H.splice(i,1);localStorage.setItem('ttg_h3',JSON.stringify(H));renderDY();renderOV();renderRT();syncAccountSelect();toast('종목 삭제 완료: Firebase 저장 필요');}
 
-function sortDYByAccount(){
-  H=H.map((h,i)=>({h,i})).sort((x,y)=>{
+function getDYDisplayRows(){
+  const rows=H.map((h,i)=>({h,i}));
+  if(!DY_ACCOUNT_SORT)return rows;
+  return rows.sort((x,y)=>{
     const ax={t:x.h.t||'d',a:x.h.a||''};
     const ay={t:y.h.t||'d',a:y.h.a||''};
     const c=accountSortCompare(ax,ay);
     return c!==0?c:x.i-y.i;
-  }).map(x=>x.h);
-  localStorage.setItem('ttg_h3',JSON.stringify(H));
+  });
+}
+
+function sortDYByAccount(){
+  // 중요: 정렬 버튼은 원본 보유 배열 H를 절대 바꾸지 않는다.
+  // 화면에 보이는 순서만 계좌별로 정렬한다. 그래야 계좌명이 메리츠로 바뀌거나
+  // Firebase 저장 시 데이터가 꼬이는 문제가 생기지 않는다.
+  DY_ACCOUNT_SORT=true;
   renderDY();
-  renderOV();
-  renderRT();
-  syncAccountSelect();
-  toast('계좌별 순차정렬 완료: Firebase 저장 필요');
+  toast('계좌별 순차정렬 표시 완료: 원본 데이터는 변경하지 않음');
 }
 
 function renderDY(){
@@ -1256,8 +1262,9 @@ function renderDY(){
   const fx=RT.fx||1504.77;
   const tb=document.getElementById('dy-tbody');if(!tb)return;tb.innerHTML='';
   let tot2=0;
-  H.forEach((h,i)=>{
-    const v=val(h,fx);tot2+=v;
+  H.forEach(h=>{tot2+=val(h,fx);});
+  getDYDisplayRows().forEach(({h,i})=>{
+    const v=val(h,fx);
     const pr=h.c==='USD'?'$'+h.p.toLocaleString(undefined,{maximumFractionDigits:2}):'₩'+h.p.toLocaleString();
     const tr=document.createElement('tr');
     tr.innerHTML=`<td class="nm" style="font-size:12px;">${h.a}</td><td class="nm" style="font-size:12px;">${h.e}</td><td><span class="tk ${h.cl}">${h.tk}</span></td><td><input type="number" value="${h.q}" step="0.0001" style="width:110px;" id="dy-q-${i}" onchange="updDY(${i},this.value)"></td><td style="color:var(--ac);font-size:12px;">${pr}</td><td class="ac" id="dy-v-${i}">${fmtM(v)}</td><td><button class="btn rd sm" onclick="deleteAsset(${i})">- 삭제</button></td>`;
@@ -1295,3 +1302,4 @@ setTimeout(()=>{if(window._authReady&&window._user){renderAll();startAutoRefresh
 </script>
 </body>
 </html>
+  
