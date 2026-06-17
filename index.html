@@ -214,7 +214,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v2.7</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v2.8</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -410,7 +410,7 @@ input[type=number]{text-align:left;}
   <div class="card mb">
     <div style="display:grid;grid-template-columns:220px 1fr 90px 95px 90px auto;gap:8px;align-items:end;">
       <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">계좌 선택</div><select id="asset-account-select" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:6px 8px;border-radius:5px;font-size:13px;"></select></div>
-      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">티커/종목코드</div><input type="text" id="asset-query" placeholder="QQQM 또는 379810" style="width:100%;" onkeydown="if(event.key==='Enter')searchAsset();"></div>
+      <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">티커/종목코드</div><input type="text" id="asset-query" placeholder="QQQM 또는 379810 또는 0019K0" style="width:100%;" onkeydown="if(event.key==='Enter')searchAsset();"></div>
       <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">구분</div><select id="asset-bucket" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:6px 8px;border-radius:5px;font-size:13px;"><option value="QQQM">QQQM</option><option value="QLD">QLD</option><option value="SPYM">SPYM</option><option value="SGOV">SGOV</option></select></div>
       <div><div style="font-size:11px;color:var(--t2);margin-bottom:3px;">수량</div><input type="number" id="asset-qty" step="0.0001" placeholder="0" style="width:100%;"></div>
       <button class="btn sm" onclick="searchAsset()">검색</button>
@@ -657,7 +657,21 @@ async function fetchWithTimeout(url,opts={},timeout=3200){const controller=new A
 async function fetchTextNoCache(url,timeout=3200){const u=url+(url.includes('?')?'&':'?')+'_ts='+Date.now();const urls=[u,'https://api.allorigins.win/raw?url='+encodeURIComponent(u)+'&_ts='+Date.now(),'https://corsproxy.io/?'+encodeURIComponent(u)];for(const x of urls){try{const r=await fetchWithTimeout(x,{cache:'no-store'},timeout);if(r.ok)return await r.text();}catch(e){}}return null;}
 async function fetchJsonNoCache(url,timeout=3200){const txt=await fetchTextNoCache(url,timeout);if(!txt)return null;try{return JSON.parse(txt);}catch(e){return null;}}
 async function firstSuccessful(tasks){if(!tasks.length)return null;return await new Promise(resolve=>{let done=false,left=tasks.length;tasks.forEach(fn=>{Promise.resolve().then(fn).then(res=>{if(!done&&res&&res.price){done=true;resolve(res);}}).catch(()=>{}).finally(()=>{left--;if(left===0&&!done)resolve(null);});});});}
-function yahooCandidates(sym){if(/^\d{6}\.(KS|KQ)$/i.test(sym)){const code=sym.slice(0,6);return[`${code}.KS`,`${code}.KQ`];}return[sym];}
+const KRX_CODE_RE=/^[0-9A-Z]{6}\.(KS|KQ)$/i;
+const KRX_BARE_RE=/^[0-9A-Z]{6}$/i;
+const KRX_NUMERIC_RE=/^\d{6}\.(KS|KQ)$/i;
+function isKrxSymbol(sym){return KRX_CODE_RE.test(String(sym||'').toUpperCase());}
+function isNumericKrxSymbol(sym){return KRX_NUMERIC_RE.test(String(sym||'').toUpperCase());}
+function yahooCandidates(sym){
+  const s=String(sym||'').toUpperCase();
+  if(isKrxSymbol(s)){
+    const code=s.slice(0,6);
+    const suffix=s.slice(6);
+    const alt=suffix==='.KS'?'.KQ':'.KS';
+    return[code+suffix,code+alt];
+  }
+  return[sym];
+}
 async function fetchNaverPrice(code){try{
   const data=await fetchJsonNoCache(`https://api.stock.naver.com/stock/${code}/basic`);
   const p=parseMoney(data?.closePrice||data?.nowVal||data?.lastPrice);
@@ -693,7 +707,18 @@ async function fetchYahooPrice(sym){for(const s of yahooCandidates(sym)){try{con
 async function fetchStooqPrice(sym){if(/\./.test(sym)||/^\d/.test(sym))return null;try{const txt=await fetchTextNoCache(`https://stooq.com/q/l/?s=${sym.toLowerCase()}.us&f=sd2t2ohlcv&h&e=csv`);if(!txt)return null;const lines=txt.trim().split(/\r?\n/);if(lines.length<2)return null;const cols=lines[1].split(',');const close=parseMoney(cols[6]||cols[4]);if(close&&close>0)return{price:close,prev:close,source:'Stooq',symbol:sym,name:sym};}catch(e){}return null;}
 function delay(ms){return new Promise(r=>setTimeout(r,ms));}
 async function preferredPrice(primaryFn,fallbackFns=[],waitMs=1600){try{const primary=primaryFn();const fast=await Promise.race([primary,delay(waitMs).then(()=>null)]);if(fast&&fast.price)return fast;const fallback=await firstSuccessful(fallbackFns);if(fallback&&fallback.price)return fallback;const late=await primary.catch(()=>null);return late&&late.price?late:null;}catch(e){return await firstSuccessful(fallbackFns);}}
-async function fetchPrice(sym){if(/^\d{6}\.(KS|KQ)$/i.test(sym)){const code=sym.slice(0,6);return await preferredPrice(()=>fetchNaverPrice(code),[()=>fetchYahooPrice(sym)],1200);}return await preferredPrice(()=>fetchYahooPrice(sym),[()=>fetchStooqPrice(sym)],1700);}
+async function fetchPrice(sym){
+  const s=String(sym||'').toUpperCase();
+  if(isKrxSymbol(s)){
+    const code=s.slice(0,6);
+    // 일반 숫자 6자리 ETF는 네이버가 빠르고, 0019K0 같은 영문 포함 KRX 코드는 Yahoo가 더 잘 잡힌다.
+    if(/^\d{6}$/.test(code)){
+      return await preferredPrice(()=>fetchNaverPrice(code),[()=>fetchYahooPrice(s)],1200);
+    }
+    return await preferredPrice(()=>fetchYahooPrice(s),[()=>fetchNaverPrice(code)],1700);
+  }
+  return await preferredPrice(()=>fetchYahooPrice(sym),[()=>fetchStooqPrice(sym)],1700);
+}
 
 async function refreshPrices(silent=false,saveRemote=false){
   const spin=document.getElementById('rspin');if(spin)spin.style.display='inline-block';
@@ -1052,9 +1077,16 @@ function acctTypeLabel(t){return t==='i'?'ISA':t==='r'?'RSA':t==='p'?'IRP/DC':'�
 function getUniqueAccounts(){const map=new Map();H.forEach(h=>{if(!h||!h.a)return;const key=(h.t||'d')+'|'+h.a;if(!map.has(key))map.set(key,{t:h.t||'d',a:h.a});});return[...map.values()].sort((x,y)=>{const order={d:0,i:1,r:2,p:3};return(order[x.t]??9)-(order[y.t]??9)||String(x.a).localeCompare(String(y.a),'ko');});}
 function syncAccountSelect(){const sel=document.getElementById('asset-account-select');if(!sel)return;const prev=sel.dataset.selectedText||sel.options[sel.selectedIndex]?.textContent||'';ACCOUNT_CACHE=getUniqueAccounts();sel.innerHTML='';ACCOUNT_CACHE.forEach((acc,i)=>{const opt=document.createElement('option');opt.value=String(i);opt.textContent=`${acc.a}`;opt.title=acctTypeLabel(acc.t);sel.appendChild(opt);});if(!ACCOUNT_CACHE.length){const opt=document.createElement('option');opt.value='';opt.textContent='등록된 계좌 없음';sel.appendChild(opt);}else{const found=[...sel.options].find(o=>o.textContent===prev);if(found)sel.value=found.value;}}
 function selectedAssetAccount(){const sel=document.getElementById('asset-account-select');if(!sel)return null;const acc=ACCOUNT_CACHE[Number(sel.value)];if(sel.options[sel.selectedIndex])sel.dataset.selectedText=sel.options[sel.selectedIndex].textContent;return acc||null;}
-function normAssetQuery(q){let s=String(q||'').trim();if(!s)return null;s=s.toUpperCase();if(/^\d{6}$/.test(s))return s+'.KS';return s;}
+function normAssetQuery(q){
+  let s=String(q||'').trim();
+  if(!s)return null;
+  s=s.toUpperCase().replace(/[^0-9A-Z.]/g,'');
+  // 379810 같은 숫자 6자리뿐 아니라 0019K0 같은 영문 포함 KRX 코드도 .KS를 붙인다.
+  if(KRX_BARE_RE.test(s))return s+'.KS';
+  return s;
+}
 function bucketClass(tk){const k=String(tk||'').toUpperCase();if(k==='QLD')return 'ql';if(k==='SPYM')return 'sp';if(k==='SGOV')return 'sg';return 'qm';}
-async function searchAsset(){const q=normAssetQuery(document.getElementById('asset-query')?.value);const out=document.getElementById('asset-search-result');if(!q){toast('티커/종목코드를 입력하세요',true);return;}if(out)out.textContent='검색중... '+q;const res=await fetchPrice(q);if(!res||!res.price){ASSET_SEARCH=null;if(out)out.textContent='검색 실패: '+q;toast('종목 검색 실패',true);return;}const isKr=/^\d{6}\.(KS|KQ)$/i.test(q);const name=res.name||q;ASSET_SEARCH={query:q,symbol:isKr?'':q,krx:isKr?q:'',currency:isKr?'KRW':'USD',price:Number(res.price),name};const pr=isKr?'₩'+Number(res.price).toLocaleString():'$'+Number(res.price).toLocaleString(undefined,{maximumFractionDigits:2});if(out)out.textContent=`검색 완료: ${q} · ${name} · ${pr} · ${res.source}`;}
+async function searchAsset(){const q=normAssetQuery(document.getElementById('asset-query')?.value);const out=document.getElementById('asset-search-result');if(!q){toast('티커/종목코드를 입력하세요',true);return;}if(out)out.textContent='검색중... '+q;const res=await fetchPrice(q);if(!res||!res.price){ASSET_SEARCH=null;if(out)out.textContent='검색 실패: '+q;toast('종목 검색 실패',true);return;}const isKr=isKrxSymbol(q);const name=res.name||q;ASSET_SEARCH={query:q,symbol:isKr?'':q,krx:isKr?q:'',currency:isKr?'KRW':'USD',price:Number(res.price),name};const pr=isKr?'₩'+Number(res.price).toLocaleString():'$'+Number(res.price).toLocaleString(undefined,{maximumFractionDigits:2});if(out)out.textContent=`검색 완료: ${q} · ${name} · ${pr} · ${res.source}`;}
 async function addAssetFromForm(){if(!ASSET_SEARCH){await searchAsset();}if(!ASSET_SEARCH)return;syncAccountSelect();const acc=selectedAssetAccount();if(!acc)return toast('계좌를 선택하세요',true);const type=acc.t,account=acc.a;const bucket=(document.getElementById('asset-bucket')?.value||'QQQM').toUpperCase();const qty=Number(document.getElementById('asset-qty')?.value||0);if(!Number.isFinite(qty)||qty<=0)return toast('수량을 0보다 크게 입력하세요',true);H.push({t:type,a:account,e:ASSET_SEARCH.name||ASSET_SEARCH.query,tk:bucket,cl:bucketClass(bucket),sym:ASSET_SEARCH.symbol,krx:ASSET_SEARCH.krx,p:ASSET_SEARCH.price,q:qty,c:ASSET_SEARCH.currency,r:''});localStorage.setItem('ttg_h3',JSON.stringify(H));ASSET_SEARCH=null;const out=document.getElementById('asset-search-result');if(out)out.textContent='종목 추가 완료. Firebase 저장 버튼을 눌러 확정하세요.';const qe=document.getElementById('asset-query');if(qe)qe.value='';const qtyEl=document.getElementById('asset-qty');if(qtyEl)qtyEl.value='';renderDY();renderOV();renderRT();syncAccountSelect();toast('종목 추가 완료: Firebase 저장 필요');}
 function deleteAsset(i){const h=H[i];if(!h)return;if(!confirm(`${h.a} / ${h.e} 항목을 삭제할까요?`))return;H.splice(i,1);localStorage.setItem('ttg_h3',JSON.stringify(H));renderDY();renderOV();renderRT();syncAccountSelect();toast('종목 삭제 완료: Firebase 저장 필요');}
 
