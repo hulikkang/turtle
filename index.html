@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>거북투자종합회사</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -210,6 +211,29 @@ input[type=number]{text-align:left;}
   .mv{font-size:19px;}
   table{min-width:680px;}
 }
+
+/* ===== FINVIZ형 자산 트리맵 ===== */
+.map-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+.map-toolbar-group{display:flex;gap:5px;align-items:center;flex-wrap:wrap;padding:5px;background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:7px;}
+.map-toolbar-label{font-size:11px;color:var(--t3);padding:0 4px;white-space:nowrap;}
+.map-btn{background:transparent;border:1px solid transparent;color:var(--t2);padding:6px 10px;border-radius:5px;cursor:pointer;font-size:12px;white-space:nowrap;}
+.map-btn:hover{color:var(--t1);background:rgba(255,255,255,.04);}
+.map-btn.on{color:var(--ac);border-color:rgba(0,212,170,.3);background:rgba(0,212,170,.09);font-weight:700;}
+.map-card{padding:10px;overflow:hidden;}
+#asset-map{width:100%;height:620px;min-height:440px;border-radius:6px;overflow:hidden;background:#11161d;}
+.map-help{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:9px;color:var(--t3);font-size:11px;line-height:1.5;}
+.map-legend{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.map-swatch{width:28px;height:8px;border-radius:2px;display:inline-block;}
+.map-stat-note{font-size:11px;color:var(--t3);margin-top:4px;}
+@media(max-width:640px){
+  .map-toolbar{align-items:stretch;}
+  .map-toolbar-group{width:100%;}
+  .map-btn{flex:1;text-align:center;padding:7px 6px;}
+  #asset-map{height:520px;min-height:420px;}
+  .map-card{padding:6px;}
+  .map-help{font-size:10px;}
+}
+
 </style>
 </head>
 <body>
@@ -218,6 +242,7 @@ input[type=number]{text-align:left;}
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
+    <div class="tab" onclick="sp('mp')">자산맵</div>
     <div class="tab" onclick="sp('lg')">자산LOG</div>
     <div class="tab" onclick="sp('sc')">시나리오</div>
     <div class="tab" onclick="sp('dy')">수량입력</div>
@@ -357,6 +382,43 @@ input[type=number]{text-align:left;}
       <tbody id="rt-tbody"></tbody>
       <tfoot><tr><td colspan="5" class="nm">총계</td><td class="ac" id="rt-grand">-</td></tr></tfoot>
     </table>
+  </div>
+</div>
+
+
+<!-- ASSET MAP -->
+<div class="pg" id="pg-mp">
+  <div class="g3">
+    <div class="card hi"><div class="ct">맵 표시 합계</div><div class="mv ac" id="mp-total">-</div><div class="ms" id="mp-total-sub">-</div></div>
+    <div class="card"><div class="ct">가중 전일 등락</div><div class="mv" id="mp-change">-</div><div class="ms" id="mp-change-won">-</div></div>
+    <div class="card"><div class="ct">구성</div><div class="mv sm" id="mp-count">-</div><div class="ms" id="mp-mode-desc">-</div></div>
+  </div>
+  <div class="map-toolbar">
+    <div class="map-toolbar-group">
+      <span class="map-toolbar-label">분류</span>
+      <button class="map-btn on" id="mp-group-ticker" onclick="setMapGroup('ticker')">종목별</button>
+      <button class="map-btn" id="mp-group-account" onclick="setMapGroup('account')">계좌별</button>
+    </div>
+    <div class="map-toolbar-group">
+      <span class="map-toolbar-label">면적</span>
+      <button class="map-btn on" id="mp-size-value" onclick="setMapSize('value')">평가금액</button>
+      <button class="map-btn" id="mp-size-exposure" onclick="setMapSize('exposure')">주식 실효노출</button>
+    </div>
+    <button class="btn sm" onclick="renderAssetMap()">맵 새로고침</button>
+    <button class="btn sm" onclick="resetAssetMapZoom()">전체 보기</button>
+  </div>
+  <div class="card map-card" id="asset-map-card">
+    <div id="asset-map"></div>
+    <div class="map-help">
+      <span>사각형 면적은 선택 기준, 색상은 각 보유종목의 전일 대비 등락률입니다. 상위 구역을 클릭하면 확대됩니다.</span>
+      <span class="map-legend">
+        <span>-3%</span><span class="map-swatch" style="background:#7f1d1d"></span>
+        <span class="map-swatch" style="background:#b91c1c"></span>
+        <span class="map-swatch" style="background:#374151"></span>
+        <span class="map-swatch" style="background:#15803d"></span>
+        <span class="map-swatch" style="background:#065f46"></span><span>+3%</span>
+      </span>
+    </div>
   </div>
 </div>
 
@@ -775,7 +837,7 @@ async function fbLoad(){
 let autoStarted=false;
 async function startAutoRefresh(){if(autoStarted)return;autoStarted=true;await refreshPrices(true,true);setInterval(()=>fetchFX(true),5*60*1000);setInterval(()=>refreshPrices(true,true),15*60*1000);}
 
-function renderAll(){renderOV();renderRT();renderLG();renderLogChart();if(document.getElementById('pg-sc')?.classList.contains('on')){calcSC();renderSCChart();}if(document.getElementById('pg-dy').classList.contains('on'))renderDY();}
+function renderAll(){renderOV();renderRT();renderLG();renderLogChart();if(document.getElementById('pg-mp')?.classList.contains('on'))renderAssetMap();if(document.getElementById('pg-sc')?.classList.contains('on')){calcSC();renderSCChart();}if(document.getElementById('pg-dy').classList.contains('on'))renderDY();}
 
 let charts={};
 function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
@@ -784,10 +846,11 @@ function sp(id){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   document.getElementById('pg-'+id).classList.add('on');
-  const map={ov:'개요',rt:'실시간',lg:'자산LOG',sc:'시나리오',dy:'수량입력'};
+  const map={ov:'개요',rt:'실시간',mp:'자산맵',lg:'자산LOG',sc:'시나리오',dy:'수량입력'};
   document.querySelectorAll('.tab').forEach(t=>{if(t.textContent===map[id])t.classList.add('on');});
   if(id==='ov')renderOV();
   if(id==='rt')renderRT();
+  if(id==='mp'){setTimeout(()=>renderAssetMap(),0);}
   if(id==='lg'){renderLG();renderLogChart();}
   if(id==='sc'){calcSC();renderSCChart();}
   if(id==='dy')renderDY();
@@ -909,6 +972,157 @@ function renderOV(){
   renderHoldingsGroup('ov-isa','ov-is','ov-ip','ov-ichg',['i'],liveTot,fx,'isa');
   renderHoldingsGroup('ov-pen','ov-ps','ov-pp','ov-pchg',['r','p'],liveTot,fx,'pen');
 }
+
+
+// ===== FINVIZ형 자산 트리맵 =====
+let MAP_STATE={group:'ticker',size:'value'};
+let assetMapChart=null;
+
+function setMapGroup(group){
+  MAP_STATE.group=group==='account'?'account':'ticker';
+  document.getElementById('mp-group-ticker')?.classList.toggle('on',MAP_STATE.group==='ticker');
+  document.getElementById('mp-group-account')?.classList.toggle('on',MAP_STATE.group==='account');
+  renderAssetMap();
+}
+function setMapSize(size){
+  MAP_STATE.size=size==='exposure'?'exposure':'value';
+  document.getElementById('mp-size-value')?.classList.toggle('on',MAP_STATE.size==='value');
+  document.getElementById('mp-size-exposure')?.classList.toggle('on',MAP_STATE.size==='exposure');
+  renderAssetMap();
+}
+function equityExposureMultiplier(h){
+  const k=String(h.tk||'').toUpperCase();
+  const name=String(h.e||'');
+  if(k==='QLD')return 2;
+  if(k==='SPYM'&&(/혼합50|MIXED.?50/i).test(name))return 0.5;
+  if(k==='QQQM'||k==='SPYM')return 1;
+  return 0;
+}
+function holdingDayPct(h){
+  const pp=prevPrice(h),cp=Number(h.p)||0;
+  return pp>0?(cp-pp)/pp*100:0;
+}
+function holdingDayWon(h,fx){return val(h,fx)-prevVal(h,fx);}
+function heatColor(pct){
+  const p=Math.max(-4,Math.min(4,Number(pct)||0));
+  if(p>=3)return '#065f46';
+  if(p>=2)return '#047857';
+  if(p>=1)return '#15803d';
+  if(p>0.05)return '#16a34a';
+  if(p<=-3)return '#7f1d1d';
+  if(p<=-2)return '#991b1b';
+  if(p<=-1)return '#b91c1c';
+  if(p<-0.05)return '#dc2626';
+  return '#374151';
+}
+function mapMetric(h,fx){
+  const actual=val(h,fx);
+  return MAP_STATE.size==='exposure'?actual*equityExposureMultiplier(h):actual;
+}
+function mapGroupName(h){
+  return MAP_STATE.group==='account'?String(h.a||'기타'):String(h.tk||'기타');
+}
+function mapLeafName(h){
+  return MAP_STATE.group==='account'?String(h.tk||h.e||'종목'):String(h.a||'계좌');
+}
+function buildAssetMapData(){
+  const fx=RT.fx||1504.77;
+  const grouped=new Map();
+  H.forEach((h,index)=>{
+    const metric=mapMetric(h,fx);
+    if(!(metric>0))return;
+    const group=mapGroupName(h);
+    if(!grouped.has(group))grouped.set(group,[]);
+    const actual=val(h,fx),pct=holdingDayPct(h),dayWon=holdingDayWon(h,fx);
+    grouped.get(group).push({
+      name:mapLeafName(h),
+      value:metric,
+      actualValue:actual,
+      exposureValue:actual*equityExposureMultiplier(h),
+      pct,dayWon,
+      account:h.a,ticker:h.tk,etf:h.e,qty:h.q,
+      price:priceText(h),
+      currency:h.c,
+      itemStyle:{color:heatColor(pct)},
+      _holdingIndex:index
+    });
+  });
+  return [...grouped.entries()].map(([name,children])=>({
+    name,
+    children:children.sort((a,b)=>b.value-a.value),
+    itemStyle:{borderColor:'#0d1117'}
+  })).sort((a,b)=>b.children.reduce((s,x)=>s+x.value,0)-a.children.reduce((s,x)=>s+x.value,0));
+}
+function renderAssetMap(){
+  const el=document.getElementById('asset-map');
+  if(!el||typeof echarts==='undefined')return;
+  const fx=RT.fx||1504.77;
+  const data=buildAssetMapData();
+  const leaves=data.flatMap(g=>g.children||[]);
+  const metricTotal=leaves.reduce((s,x)=>s+Number(x.value||0),0);
+  const actualTotal=leaves.reduce((s,x)=>s+Number(x.actualValue||0),0);
+  const weightedPct=metricTotal?leaves.reduce((s,x)=>s+Number(x.value||0)*Number(x.pct||0),0)/metricTotal:0;
+  const dayWon=leaves.reduce((s,x)=>s+Number(x.dayWon||0),0);
+  const se=(id,text)=>{const x=document.getElementById(id);if(x)x.textContent=text;};
+  se('mp-total',fmtO(metricTotal));
+  se('mp-total-sub',MAP_STATE.size==='value'?('현재 평가액 ₩'+fmtW(metricTotal)):('전체 총자산 ₩'+fmtW(grand(fx))+' · SGOV 등 0배 제외'));
+  const ch=document.getElementById('mp-change');if(ch){ch.textContent=fmtSignedPct(weightedPct);ch.className='mv '+signClass(weightedPct);}
+  const cw=document.getElementById('mp-change-won');if(cw){cw.textContent=fmtSignedM(dayWon);cw.className='ms '+signClass(dayWon);}
+  se('mp-count',data.length+'개 구역 · '+leaves.length+'개 블록');
+  se('mp-mode-desc',(MAP_STATE.group==='ticker'?'종목별':'계좌별')+' / '+(MAP_STATE.size==='value'?'평가금액':'QLD 2배·QQQM/SPYM 1배·혼합50 0.5배'));
+
+  if(!assetMapChart)assetMapChart=echarts.init(el,null,{renderer:'canvas'});
+  const option={
+    backgroundColor:'#11161d',
+    animationDurationUpdate:450,
+    tooltip:{
+      backgroundColor:'rgba(13,17,23,.96)',borderColor:'rgba(0,212,170,.35)',textStyle:{color:'#e6edf3',fontSize:12},
+      formatter:p=>{
+        const d=p.data||{};
+        if(d.children){
+          const sum=d.children.reduce((s,x)=>s+Number(x.value||0),0);
+          return `<b>${d.name}</b><br>표시 합계: ₩${fmtW(sum)}<br>블록: ${d.children.length}개`;
+        }
+        const pct=Number(d.pct||0),sign=pct>0?'+':'';
+        const exposureLine=MAP_STATE.size==='exposure'?`<br>실효노출: ₩${fmtW(d.exposureValue)}`:'';
+        return `<b>${d.ticker} · ${d.account}</b><br>${d.etf}<br>평가금액: ₩${fmtW(d.actualValue)}${exposureLine}<br>전체자산 비중: ${grand(fx)?(d.actualValue/grand(fx)*100).toFixed(2):'0.00'}%<br>전일등락: ${sign}${pct.toFixed(2)}% (${fmtSignedM(d.dayWon)})<br>현재가: ${d.price}<br>수량: ${Number(d.qty).toLocaleString()}`;
+      }
+    },
+    series:[{
+      name:'자산맵',type:'treemap',data,
+      left:0,right:0,top:0,bottom:26,
+      roam:false,nodeClick:'zoomToNode',leafDepth:2,visibleMin:20,
+      sort:'desc',squareRatio:1.15,
+      breadcrumb:{show:true,height:26,bottom:0,itemStyle:{color:'#21262d',borderColor:'#30363d',textStyle:{color:'#8b949e',fontSize:11}},emphasis:{itemStyle:{color:'#30363d'}}},
+      label:{
+        show:true,color:'#fff',fontWeight:700,fontSize:12,lineHeight:17,overflow:'truncate',
+        formatter:p=>{
+          const d=p.data||{};
+          if(d.children)return d.name;
+          const pct=Number(d.pct||0),sg=pct>0?'+':'';
+          const amount=MAP_STATE.size==='exposure'?d.value:d.actualValue;
+          return `${d.name}\n${fmtO(amount)}\n${sg}${pct.toFixed(2)}%`;
+        }
+      },
+      upperLabel:{show:true,height:28,color:'#e6edf3',fontSize:13,fontWeight:800,backgroundColor:'rgba(13,17,23,.78)',padding:[5,7]},
+      itemStyle:{borderColor:'#0d1117',borderWidth:2,gapWidth:2},
+      levels:[
+        {itemStyle:{borderColor:'#0d1117',borderWidth:0,gapWidth:4}},
+        {upperLabel:{show:true},itemStyle:{borderColor:'#0d1117',borderWidth:4,gapWidth:3}},
+        {label:{show:true},itemStyle:{borderColor:'#11161d',borderWidth:1,gapWidth:1}}
+      ],
+      emphasis:{label:{fontSize:13},itemStyle:{borderColor:'#e6edf3',borderWidth:2}}
+    }]
+  };
+  assetMapChart.setOption(option,true);
+  setTimeout(()=>assetMapChart?.resize(),0);
+}
+function resetAssetMapZoom(){
+  if(!assetMapChart){renderAssetMap();return;}
+  assetMapChart.dispatchAction({type:'treemapRootToNode',targetNode:'root'});
+  renderAssetMap();
+}
+window.addEventListener('resize',()=>assetMapChart?.resize());
 
 function renderRT(){
   const fx=RT.fx||1504.77;
