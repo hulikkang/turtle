@@ -715,17 +715,128 @@ async function fetchFX(updateScreen=true,notify=false){
 }
 async function refreshFXManual(){await fetchFX(true,true);}
 
-function parseMoney(v){if(v===null||v===undefined)return null;if(typeof v==='number')return Number.isFinite(v)?v:null;const s=String(v).replace(/[^\d.-]/g,'');if(!s)return null;const n=Number(s);return Number.isFinite(n)?n:null;}
-function lastFinite(arr){if(!Array.isArray(arr))return null;for(let i=arr.length-1;i>=0;i--){const n=Number(arr[i]);if(Number.isFinite(n)&&n>0)return n;}return null;}
-async function fetchWithTimeout(url,opts={},timeout=3200){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeout);try{return await fetch(url,{...opts,signal:controller.signal});}finally{clearTimeout(timer);}}
-async function fetchTextNoCache(url,timeout=3200){const u=url+(url.includes('?')?'&':'?')+'_ts='+Date.now();const urls=[u,'https://api.allorigins.win/raw?url='+encodeURIComponent(u)+'&_ts='+Date.now(),'https://corsproxy.io/?'+encodeURIComponent(u)];for(const x of urls){try{const r=await fetchWithTimeout(x,{cache:'no-store'},timeout);if(r.ok)return await r.text();}catch(e){}}return null;}
-async function fetchJsonNoCache(url,timeout=3200){const txt=await fetchTextNoCache(url,timeout);if(!txt)return null;try{return JSON.parse(txt);}catch(e){return null;}}
-async function firstSuccessful(tasks){if(!tasks.length)return null;return await new Promise(resolve=>{let done=false,left=tasks.length;tasks.forEach(fn=>{Promise.resolve().then(fn).then(res=>{if(!done&&res&&res.price){done=true;resolve(res);}}).catch(()=>{}).finally(()=>{left--;if(left===0&&!done)resolve(null);});});});}
+function parseMoney(v){
+  if(v===null||v===undefined)return null;
+  if(typeof v==='number')return Number.isFinite(v)?v:null;
+  const s=String(v).replace(/[^\d.-]/g,'');
+  if(!s)return null;
+  const n=Number(s);
+  return Number.isFinite(n)?n:null;
+}
+function lastFinite(arr){
+  if(!Array.isArray(arr))return null;
+  for(let i=arr.length-1;i>=0;i--){
+    const n=Number(arr[i]);
+    if(Number.isFinite(n)&&n>0)return n;
+  }
+  return null;
+}
+
+// ===== 시세 통신 v3.2 =====
+// 정적 HTML에서 Yahoo/Naver 직접 호출이 CORS로 막힐 수 있으므로
+// 직접 호출 -> AllOrigins -> CodeTabs -> CorsProxy 순으로 재시도한다.
+// 200 OK라도 HTML/오류 JSON이면 다음 경로로 계속 넘어간다.
+async function fetchWithTimeout(url,opts={},timeout=6500){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeout);
+  try{
+    return await fetch(url,{cache:'no-store',credentials:'omit',...opts,signal:controller.signal});
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
+function buildFetchRoutes(url){
+  const sep=url.includes('?')?'&':'?';
+  const target=url+sep+'_ttg_ts='+Date.now()+'_'+Math.random().toString(36).slice(2);
+  return[
+    {name:'DIRECT',url:target},
+    {name:'ALLORIGINS',url:'https://api.allorigins.win/raw?url='+encodeURIComponent(target)},
+    {name:'CODETABS',url:'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(target)},
+    {name:'CORSPROXY',url:'https://corsproxy.io/?url='+encodeURIComponent(target)}
+  ];
+}
+
+async function fetchTextNoCache(url,timeout=6500,validator=null){
+  const routes=buildFetchRoutes(url);
+  for(const route of routes){
+    try{
+      const r=await fetchWithTimeout(route.url,{},timeout);
+      if(!r.ok){
+        console.warn(`[TTG ${route.name}] HTTP ${r.status}`,url);
+        continue;
+      }
+      const txt=await r.text();
+      if(!txt||!txt.trim()){
+        console.warn(`[TTG ${route.name}] empty response`,url);
+        continue;
+      }
+      if(validator&&!validator(txt)){
+        console.warn(`[TTG ${route.name}] text rejected`,url,txt.slice(0,120));
+        continue;
+      }
+      return txt;
+    }catch(e){
+      console.warn(`[TTG ${route.name}] request failed`,url,e?.message||e);
+    }
+  }
+  return null;
+}
+
+async function fetchJsonNoCache(url,timeout=6500,validator=null){
+  const routes=buildFetchRoutes(url);
+  for(const route of routes){
+    try{
+      const r=await fetchWithTimeout(route.url,{},timeout);
+      if(!r.ok){
+        console.warn(`[TTG ${route.name}] HTTP ${r.status}`,url);
+        continue;
+      }
+      const txt=await r.text();
+      if(!txt||!txt.trim()){
+        console.warn(`[TTG ${route.name}] empty response`,url);
+        continue;
+      }
+      let data;
+      try{
+        data=JSON.parse(txt);
+      }catch(e){
+        console.warn(`[TTG ${route.name}] JSON parse failed`,url,txt.slice(0,120));
+        continue;
+      }
+      if(validator&&!validator(data)){
+        console.warn(`[TTG ${route.name}] JSON rejected`,url,data);
+        continue;
+      }
+      return data;
+    }catch(e){
+      console.warn(`[TTG ${route.name}] request failed`,url,e?.message||e);
+    }
+  }
+  return null;
+}
+
+async function firstSuccessful(tasks){
+  if(!tasks.length)return null;
+  return await new Promise(resolve=>{
+    let done=false,left=tasks.length;
+    tasks.forEach(fn=>{
+      Promise.resolve().then(fn).then(res=>{
+        if(!done&&res&&Number(res.price)>0){done=true;resolve(res);}
+      }).catch(()=>{}).finally(()=>{
+        left--;
+        if(left===0&&!done)resolve(null);
+      });
+    });
+  });
+}
+
 const KRX_CODE_RE=/^[0-9A-Z]{6}\.(KS|KQ)$/i;
 const KRX_BARE_RE=/^[0-9A-Z]{6}$/i;
 const KRX_NUMERIC_RE=/^\d{6}\.(KS|KQ)$/i;
 function isKrxSymbol(sym){return KRX_CODE_RE.test(String(sym||'').toUpperCase());}
 function isNumericKrxSymbol(sym){return KRX_NUMERIC_RE.test(String(sym||'').toUpperCase());}
+
 function yahooCandidates(sym){
   const s=String(sym||'').toUpperCase();
   if(isKrxSymbol(s)){
@@ -734,18 +845,41 @@ function yahooCandidates(sym){
     const alt=suffix==='.KS'?'.KQ':'.KS';
     return[code+suffix,code+alt];
   }
-  return[sym];
+  return[s];
 }
-async function fetchNaverPrice(code){try{
-  const data=await fetchJsonNoCache(`https://api.stock.naver.com/stock/${code}/basic`);
-  const p=parseMoney(data?.closePrice||data?.nowVal||data?.lastPrice);
-  if(p&&p>0){
-    const diff=parseMoney(data?.compareToPreviousClosePrice||data?.fluctuations||data?.compareToPreviousPrice);
-    const prevRaw=parseMoney(data?.previousClosePrice||data?.prevClosingPrice||data?.prevClose);
-    const prev=(prevRaw&&prevRaw>0)?prevRaw:(Number.isFinite(diff)?p-diff:null);
-    return{price:p,prev:(prev&&prev>0)?prev:p,source:'Naver',symbol:code,name:data?.stockName||code};
+
+function naverPriceFromData(data){
+  return parseMoney(data?.closePrice??data?.nowVal??data?.lastPrice);
+}
+
+async function fetchNaverPrice(code){
+  const urls=[
+    `https://api.stock.naver.com/stock/${code}/basic`,
+    `https://m.stock.naver.com/api/stock/${code}/basic`
+  ];
+  for(const url of urls){
+    try{
+      const data=await fetchJsonNoCache(url,6500,d=>Number(naverPriceFromData(d))>0);
+      if(!data)continue;
+      const p=naverPriceFromData(data);
+      if(!(p>0))continue;
+      const diff=parseMoney(data?.compareToPreviousClosePrice??data?.fluctuations??data?.compareToPreviousPrice);
+      const prevRaw=parseMoney(data?.previousClosePrice??data?.prevClosingPrice??data?.prevClose);
+      const prev=(prevRaw&&prevRaw>0)?prevRaw:(Number.isFinite(diff)?p-diff:p);
+      return{
+        price:p,
+        prev:(prev&&prev>0)?prev:p,
+        source:'Naver',
+        symbol:code,
+        name:data?.stockName||data?.itemName||code
+      };
+    }catch(e){
+      console.warn('[TTG NAVER] price failed',code,e?.message||e);
+    }
   }
-}catch(e){}return null;}
+  return null;
+}
+
 function pickYahooPrice(result){
   if(!result)return null;
   const meta=result.meta||{};
@@ -754,7 +888,8 @@ function pickYahooPrice(result){
   const state=String(meta.marketState||'').toUpperCase();
   const candidates=[];
 
-  // v2.7: 프리/애프터 포함 최신 1분봉 가격을 정규장 종가보다 우선 사용
+  // 프리/애프터 장에서는 해당 가격을 먼저 사용하고,
+  // 그 외에는 최신 1분봉 -> 정규장 -> 전일종가 순으로 사용한다.
   if(state.includes('PRE'))candidates.push(meta.preMarketPrice);
   if(state.includes('POST'))candidates.push(meta.postMarketPrice);
   candidates.push(latestCandle,meta.postMarketPrice,meta.preMarketPrice,meta.regularMarketPrice,meta.previousClose);
@@ -762,57 +897,186 @@ function pickYahooPrice(result){
   for(const x of candidates){
     const n=Number(x);
     if(Number.isFinite(n)&&n>0){
-      return{price:n,prev:(Number(meta.previousClose)>0?Number(meta.previousClose):n)};
+      const pv=Number(meta.previousClose);
+      return{price:n,prev:(Number.isFinite(pv)&&pv>0?pv:n)};
     }
   }
   return null;
 }
-async function fetchYahooPrice(sym){for(const s of yahooCandidates(sym)){try{const url=`https://query1.finance.yahoo.com/v8/finance/chart/${s}?interval=1m&range=1d&includePrePost=true`;const data=await fetchJsonNoCache(url);const result=data?.chart?.result?.[0];const picked=pickYahooPrice(result);if(picked&&picked.price>0)return{price:picked.price,prev:picked.prev,source:'Yahoo',symbol:s,name:result?.meta?.longName||result?.meta?.shortName||s};}catch(e){}}return null;}
-async function fetchStooqPrice(sym){if(/\./.test(sym)||/^\d/.test(sym))return null;try{const txt=await fetchTextNoCache(`https://stooq.com/q/l/?s=${sym.toLowerCase()}.us&f=sd2t2ohlcv&h&e=csv`);if(!txt)return null;const lines=txt.trim().split(/\r?\n/);if(lines.length<2)return null;const cols=lines[1].split(',');const close=parseMoney(cols[6]||cols[4]);if(close&&close>0)return{price:close,prev:close,source:'Stooq',symbol:sym,name:sym};}catch(e){}return null;}
+
+async function fetchYahooPrice(sym){
+  for(const s of yahooCandidates(sym)){
+    for(const host of ['query1.finance.yahoo.com','query2.finance.yahoo.com']){
+      try{
+        const url=`https://${host}/v8/finance/chart/${encodeURIComponent(s)}?interval=1m&range=1d&includePrePost=true`;
+        const data=await fetchJsonNoCache(
+          url,
+          6500,
+          d=>Array.isArray(d?.chart?.result)&&!!d.chart.result[0]
+        );
+        const result=data?.chart?.result?.[0];
+        const picked=pickYahooPrice(result);
+        if(picked&&picked.price>0){
+          return{
+            price:picked.price,
+            prev:picked.prev,
+            source:host.startsWith('query1')?'Yahoo1':'Yahoo2',
+            symbol:s,
+            name:result?.meta?.longName||result?.meta?.shortName||s
+          };
+        }
+      }catch(e){
+        console.warn('[TTG YAHOO] price failed',s,host,e?.message||e);
+      }
+    }
+  }
+  return null;
+}
+
+async function fetchStooqPrice(sym){
+  if(/\./.test(sym)||/^\d/.test(sym))return null;
+  try{
+    const url=`https://stooq.com/q/l/?s=${sym.toLowerCase()}.us&f=sd2t2ohlcv&h&e=csv`;
+    const txt=await fetchTextNoCache(url,6500,t=>/Symbol/i.test(t)&&t.trim().split(/\r?\n/).length>=2);
+    if(!txt)return null;
+    const lines=txt.trim().split(/\r?\n/);
+    if(lines.length<2)return null;
+    const cols=lines[1].split(',');
+    const close=parseMoney(cols[6]||cols[4]);
+    if(close&&close>0)return{price:close,prev:close,source:'Stooq',symbol:sym,name:sym};
+  }catch(e){
+    console.warn('[TTG STOOQ] price failed',sym,e?.message||e);
+  }
+  return null;
+}
+
 function delay(ms){return new Promise(r=>setTimeout(r,ms));}
-async function preferredPrice(primaryFn,fallbackFns=[],waitMs=1600){try{const primary=primaryFn();const fast=await Promise.race([primary,delay(waitMs).then(()=>null)]);if(fast&&fast.price)return fast;const fallback=await firstSuccessful(fallbackFns);if(fallback&&fallback.price)return fallback;const late=await primary.catch(()=>null);return late&&late.price?late:null;}catch(e){return await firstSuccessful(fallbackFns);}}
+
+async function preferredPrice(primaryFn,fallbackFns=[],waitMs=2600){
+  try{
+    const primary=primaryFn();
+    const fast=await Promise.race([primary,delay(waitMs).then(()=>null)]);
+    if(fast&&fast.price)return fast;
+    const fallback=await firstSuccessful(fallbackFns);
+    if(fallback&&fallback.price)return fallback;
+    const late=await primary.catch(()=>null);
+    return late&&late.price?late:null;
+  }catch(e){
+    return await firstSuccessful(fallbackFns);
+  }
+}
+
 async function fetchPrice(sym){
   const s=String(sym||'').toUpperCase();
   if(isKrxSymbol(s)){
     const code=s.slice(0,6);
-    // 일반 숫자 6자리 ETF는 네이버가 빠르고, 0019K0 같은 영문 포함 KRX 코드는 Yahoo가 더 잘 잡힌다.
     if(/^\d{6}$/.test(code)){
-      return await preferredPrice(()=>fetchNaverPrice(code),[()=>fetchYahooPrice(s)],1200);
+      return await preferredPrice(()=>fetchNaverPrice(code),[()=>fetchYahooPrice(s)],2600);
     }
-    return await preferredPrice(()=>fetchYahooPrice(s),[()=>fetchNaverPrice(code)],1700);
+    return await preferredPrice(()=>fetchYahooPrice(s),[()=>fetchNaverPrice(code)],3000);
   }
-  return await preferredPrice(()=>fetchYahooPrice(sym),[()=>fetchStooqPrice(sym)],1700);
+  return await preferredPrice(()=>fetchYahooPrice(s),[()=>fetchStooqPrice(s)],3000);
+}
+
+async function runWithConcurrency(items,limit,worker){
+  let cursor=0;
+  const workers=Array.from({length:Math.min(limit,items.length)},async()=>{
+    while(true){
+      const i=cursor++;
+      if(i>=items.length)return;
+      await worker(items[i],i);
+    }
+  });
+  await Promise.all(workers);
 }
 
 async function refreshPrices(silent=false,saveRemote=false){
-  const spin=document.getElementById('rspin');if(spin)spin.style.display='inline-block';
+  const spin=document.getElementById('rspin');
+  if(spin)spin.style.display='inline-block';
+
   const before=grand(RT.fx||1504.77);
   const fx=await fetchFX(false);
   const keys=[...new Set(H.map(h=>h.sym||h.krx).filter(Boolean))];
-  const pm={},prevMap={},src={};
-  await Promise.all(keys.map(async k=>{const res=await fetchPrice(k);if(res&&res.price){pm[k]=res.price;prevMap[k]=res.prev||res.price;src[k]=res.source+(res.symbol&&res.symbol!==k?`:${res.symbol}`:'');}}));
+  const pm={},prevMap={},src={},failed=[];
+
+  // 공개 프록시의 순간 rate-limit을 피하기 위해 동시 요청을 4개로 제한한다.
+  await runWithConcurrency(keys,4,async k=>{
+    try{
+      const res=await fetchPrice(k);
+      if(res&&Number(res.price)>0){
+        pm[k]=Number(res.price);
+        prevMap[k]=Number(res.prev)>0?Number(res.prev):Number(res.price);
+        src[k]=res.source+(res.symbol&&res.symbol!==k?`:${res.symbol}`:'');
+        console.log('[TTG PRICE OK]',k,pm[k],src[k]);
+      }else{
+        failed.push(k);
+        console.warn('[TTG PRICE FAIL]',k);
+      }
+    }catch(e){
+      failed.push(k);
+      console.error('[TTG PRICE EXCEPTION]',k,e);
+    }
+  });
+
   let changed=0;
-  H.forEach(h=>{const k=h.sym||h.krx;if(k&&pm[k]){if(Math.abs(Number(h.p)-Number(pm[k]))>0.000001)changed++;h.prev=(Number(prevMap[k])>0?Number(prevMap[k]):Number(h.p));h.p=Number(pm[k]);h.src=src[k]||'API';}});
+  H.forEach(h=>{
+    const k=h.sym||h.krx;
+    if(k&&Number(pm[k])>0){
+      if(Math.abs(Number(h.p)-Number(pm[k]))>0.000001)changed++;
+      h.prev=Number(prevMap[k])>0?Number(prevMap[k]):Number(h.p);
+      h.p=Number(pm[k]);
+      h.src=src[k]||'API';
+    }
+  });
+
   const after=grand(fx);
   const now=new Date().toLocaleTimeString('ko-KR');
-  const status=`${now} 시세 ${Object.keys(pm).length}/${keys.length}종 · 변동 ${changed}개 · ${fmtSignedM(after-before)}`;
-  const lu=document.getElementById('lu');if(lu)lu.textContent=status;
-  const rtLast=document.getElementById('rt-last');if(rtLast)rtLast.textContent=status;
+  const okCount=Object.keys(pm).length;
+  let status='';
+  if(okCount===0){
+    status=`${now} 시세 API 응답 0/${keys.length}종`;
+  }else if(failed.length){
+    status=`${now} 시세 ${okCount}/${keys.length}종 · 실패 ${failed.length}종 · 변동 ${changed}개 · ${fmtSignedM(after-before)}`;
+  }else{
+    status=`${now} 시세 ${okCount}/${keys.length}종 · 변동 ${changed}개 · ${fmtSignedM(after-before)}`;
+  }
+
+  const lu=document.getElementById('lu');
+  if(lu)lu.textContent=status;
+  const rtLast=document.getElementById('rt-last');
+  if(rtLast)rtLast.textContent=status;
   if(spin)spin.style.display='none';
+
   localStorage.setItem('ttg_h3',JSON.stringify(H));
   localStorage.setItem('ttg_rt3',JSON.stringify(RT));
 
-  // ===== 시세 받아온 후 총자산 캐시 저장 =====
   saveLastTotal();
-  window._pricesLoaded=true;
+  window._pricesLoaded=okCount>0;
 
-  if(saveRemote&&Object.keys(pm).length>0){await fbSaveSilent('config','holdings',{items:H,lastPriceRefresh:new Date().toISOString(),fx:RT.fx,fxSource:RT.fxSource||''});}
-  renderAll();
-  if(!silent){
-    if(Object.keys(pm).length===0)toast('시세 API 응답 0개',true);
-    else if(changed===0)toast(`시세 수신. 가격변동 없음 (${Object.keys(pm).length}/${keys.length}종)`);
-    else toast(`시세 업데이트 완료: ${Object.keys(pm).length}/${keys.length}종, 변동 ${changed}개`);
+  if(saveRemote&&okCount>0){
+    await fbSaveSilent('config','holdings',{
+      items:H,
+      lastPriceRefresh:new Date().toISOString(),
+      fx:RT.fx,
+      fxSource:RT.fxSource||''
+    });
   }
+
+  renderAll();
+
+  if(!silent){
+    if(okCount===0){
+      toast(`시세 API 응답 0/${keys.length}종 · F12 Console 확인`,true);
+    }else if(failed.length){
+      toast(`시세 ${okCount}/${keys.length}종 수신 · 실패 ${failed.length}종`,true);
+    }else if(changed===0){
+      toast(`시세 수신 성공 ${okCount}/${keys.length}종 · 가격변동 없음`);
+    }else{
+      toast(`시세 업데이트 완료: ${okCount}/${keys.length}종 · 변동 ${changed}개`);
+    }
+  }
+
+  if(failed.length)console.warn('[TTG FAILED SYMBOLS]',failed);
 }
 
 async function fbSave(col,id,data){if(!window._fbReady||!window._user){toast('Google 로그인 후 저장 가능합니다',true);return false;}try{const{doc,setDoc}=window._fs;await setDoc(doc(window._db,col,id),data);document.getElementById('sync-dot').className='sync-dot ok';return true;}catch(e){document.getElementById('sync-dot').className='sync-dot';return false;}}
