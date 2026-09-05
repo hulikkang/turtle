@@ -238,7 +238,7 @@ input[type=number]{text-align:left;}
 </head>
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v3.2</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v3.1</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -673,47 +673,28 @@ function getLiveTrendLog(tot,pri){const today=todayStr();const arr=[...LOG].filt
 
 function toast(msg,err=false){const w=document.getElementById('tw');const d=document.createElement('div');d.className='toast'+(err?' err':'');d.textContent=msg;w.appendChild(d);setTimeout(()=>d.remove(),3000);}
 
-function parseFxCandidate(v){const n=Number(v);return Number.isFinite(n)&&n>900&&n<2500?n:null;}
-function parseStooqFxCsv(txt){if(!txt)return null;const lines=String(txt).trim().split(/\r?\n/);if(lines.length<2)return null;const headers=lines[0].split(',').map(x=>x.trim().toLowerCase());const vals=lines[1].split(',').map(x=>x.trim());const closeIdx=headers.indexOf('close');const idx=closeIdx>=0?closeIdx:vals.length-2;return parseFxCandidate(vals[idx]);}
-function parseYahooFx(data){const r=data?.chart?.result?.[0];if(!r)return null;const meta=r.meta||{};const q=r.indicators?.quote?.[0]||{};const close=lastFinite(q.close);return parseFxCandidate(meta.regularMarketPrice||meta.previousClose||close);}
-
-async function fetchFX(updateScreen=true,notify=false){
-  const oldFx=Number(RT.fx)||1504.77;
-  const stamp=Date.now();
-  const sources=[
-    {name:'Yahoo FX 1m',url:`https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d&_=${stamp}`,type:'json',parse:parseYahooFx},
-    {name:'Yahoo FX 5m',url:`https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=5m&range=1d&_=${stamp}`,type:'json',parse:parseYahooFx},
-    {name:'Stooq USDKRW',url:`https://stooq.com/q/l/?s=usdkrw&f=sd2t2ohlcv&h&e=csv&_=${stamp}`,type:'text',parse:parseStooqFxCsv},
-    {name:'ER-API',url:`https://open.er-api.com/v6/latest/USD?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
-    {name:'ExchangeRateAPI',url:`https://api.exchangerate-api.com/v4/latest/USD?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
-    {name:'Frankfurter',url:`https://api.frankfurter.app/latest?from=USD&to=KRW&_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
-    {name:'CurrencyAPI',url:`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.usd?.krw)}
-  ];
-  const tried=[];
-  for(const src of sources){
-    try{
-      const raw=src.type==='text'?await fetchTextNoCache(src.url):await fetchJsonNoCache(src.url);
-      const fx=src.parse(raw);
-      tried.push(src.name+(fx?' OK':' 실패'));
-      if(fx){
-        RT.fx=fx;RT.fxSource=src.name;RT.fxTime=new Date().toLocaleTimeString('ko-KR');RT.fxTried=tried;
-        localStorage.setItem('ttg_rt3',JSON.stringify(RT));
-        ['ov-fx','rt-fx'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=RT.fx.toLocaleString(undefined,{maximumFractionDigits:2});});
-        const msg=`환율 ${RT.fx.toLocaleString(undefined,{maximumFractionDigits:2})} · ${src.name} · ${RT.fxTime}`;
-        const lu=document.getElementById('lu');if(lu)lu.textContent=msg;
-        const rtLast=document.getElementById('rt-last');if(rtLast)rtLast.textContent=msg;
-        if(updateScreen){renderOV();renderRT();renderLogChart();if(document.getElementById('pg-dy')?.classList.contains('on'))renderDY();}
-        if(notify){const diff=fx-oldFx;toast(`환율 갱신: ${fx.toLocaleString(undefined,{maximumFractionDigits:2})}원 (${diff>=0?'+':''}${diff.toFixed(2)}) · ${src.name}`);}
-        return RT.fx;
-      }
-    }catch(e){tried.push(src.name+' 오류');}
-  }
-  RT.fxTried=tried;localStorage.setItem('ttg_rt3',JSON.stringify(RT));
-  ['ov-fx','rt-fx'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=oldFx.toLocaleString(undefined,{maximumFractionDigits:2});});
-  if(notify)toast('환율 API 응답 실패',true);
-  return oldFx;
+function parseFxCandidate(v){
+  const n=Number(v);
+  return Number.isFinite(n)&&n>900&&n<2500?n:null;
 }
-async function refreshFXManual(){await fetchFX(true,true);}
+function parseStooqFxCsv(txt){
+  if(!txt)return null;
+  const lines=String(txt).trim().split(/\r?\n/);
+  if(lines.length<2)return null;
+  const headers=lines[0].split(',').map(x=>x.trim().toLowerCase());
+  const vals=lines[1].split(',').map(x=>x.trim());
+  const closeIdx=headers.indexOf('close');
+  const idx=closeIdx>=0?closeIdx:vals.length-2;
+  return parseFxCandidate(vals[idx]);
+}
+function parseYahooFx(data){
+  const r=data?.chart?.result?.[0];
+  if(!r)return null;
+  const meta=r.meta||{};
+  const q=r.indicators?.quote?.[0]||{};
+  const close=lastFinite(q.close);
+  return parseFxCandidate(meta.regularMarketPrice||meta.previousClose||close);
+}
 
 function parseMoney(v){
   if(v===null||v===undefined)return null;
@@ -731,12 +712,16 @@ function lastFinite(arr){
   }
   return null;
 }
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
 
-// ===== 시세 통신 v3.2 =====
-// 정적 HTML에서 Yahoo/Naver 직접 호출이 CORS로 막힐 수 있으므로
-// 직접 호출 -> AllOrigins -> CodeTabs -> CorsProxy 순으로 재시도한다.
-// 200 OK라도 HTML/오류 JSON이면 다음 경로로 계속 넘어간다.
-async function fetchWithTimeout(url,opts={},timeout=6500){
+// ===== 시세 통신 v3.3 FAST =====
+// 직접 요청은 짧게 시도하고, 실패하면 공개 프록시들을 병렬로 호출한다.
+// 한 경로씩 6.5초씩 기다리던 v3.2 구조를 제거했다.
+const TTG_DIRECT_TIMEOUT=900;
+const TTG_PROXY_TIMEOUT=2200;
+let PRICE_REFRESH_RUNNING=false;
+
+async function fetchWithTimeout(url,opts={},timeout=TTG_PROXY_TIMEOUT){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeout);
   try{
@@ -746,89 +731,83 @@ async function fetchWithTimeout(url,opts={},timeout=6500){
   }
 }
 
-function buildFetchRoutes(url){
+function cacheBustUrl(url){
   const sep=url.includes('?')?'&':'?';
-  const target=url+sep+'_ttg_ts='+Date.now()+'_'+Math.random().toString(36).slice(2);
+  return url+sep+'_ttg_ts='+Date.now()+'_'+Math.random().toString(36).slice(2);
+}
+
+function proxyRoutes(target){
   return[
-    {name:'DIRECT',url:target},
     {name:'ALLORIGINS',url:'https://api.allorigins.win/raw?url='+encodeURIComponent(target)},
-    {name:'CODETABS',url:'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(target)},
-    {name:'CORSPROXY',url:'https://corsproxy.io/?url='+encodeURIComponent(target)}
+    {name:'CORSPROXY',url:'https://corsproxy.io/?url='+encodeURIComponent(target)},
+    {name:'CODETABS',url:'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(target)}
   ];
 }
 
-async function fetchTextNoCache(url,timeout=6500,validator=null){
-  const routes=buildFetchRoutes(url);
-  for(const route of routes){
-    try{
-      const r=await fetchWithTimeout(route.url,{},timeout);
-      if(!r.ok){
-        console.warn(`[TTG ${route.name}] HTTP ${r.status}`,url);
-        continue;
-      }
-      const txt=await r.text();
-      if(!txt||!txt.trim()){
-        console.warn(`[TTG ${route.name}] empty response`,url);
-        continue;
-      }
-      if(validator&&!validator(txt)){
-        console.warn(`[TTG ${route.name}] text rejected`,url,txt.slice(0,120));
-        continue;
-      }
-      return txt;
-    }catch(e){
-      console.warn(`[TTG ${route.name}] request failed`,url,e?.message||e);
-    }
-  }
-  return null;
-}
-
-async function fetchJsonNoCache(url,timeout=6500,validator=null){
-  const routes=buildFetchRoutes(url);
-  for(const route of routes){
-    try{
-      const r=await fetchWithTimeout(route.url,{},timeout);
-      if(!r.ok){
-        console.warn(`[TTG ${route.name}] HTTP ${r.status}`,url);
-        continue;
-      }
-      const txt=await r.text();
-      if(!txt||!txt.trim()){
-        console.warn(`[TTG ${route.name}] empty response`,url);
-        continue;
-      }
-      let data;
-      try{
-        data=JSON.parse(txt);
-      }catch(e){
-        console.warn(`[TTG ${route.name}] JSON parse failed`,url,txt.slice(0,120));
-        continue;
-      }
-      if(validator&&!validator(data)){
-        console.warn(`[TTG ${route.name}] JSON rejected`,url,data);
-        continue;
-      }
-      return data;
-    }catch(e){
-      console.warn(`[TTG ${route.name}] request failed`,url,e?.message||e);
-    }
-  }
-  return null;
-}
-
-async function firstSuccessful(tasks){
-  if(!tasks.length)return null;
+async function firstTruthy(promises){
+  if(!promises.length)return null;
   return await new Promise(resolve=>{
-    let done=false,left=tasks.length;
-    tasks.forEach(fn=>{
-      Promise.resolve().then(fn).then(res=>{
-        if(!done&&res&&Number(res.price)>0){done=true;resolve(res);}
+    let left=promises.length,done=false;
+    promises.forEach(p=>{
+      Promise.resolve(p).then(v=>{
+        if(!done&&v){done=true;resolve(v);}
       }).catch(()=>{}).finally(()=>{
         left--;
         if(left===0&&!done)resolve(null);
       });
     });
   });
+}
+
+async function requestText(route,url,timeout,validator){
+  try{
+    const r=await fetchWithTimeout(url,{},timeout);
+    if(!r.ok){console.warn(`[TTG ${route}] HTTP ${r.status}`);return null;}
+    const txt=await r.text();
+    if(!txt||!txt.trim())return null;
+    if(validator&&!validator(txt))return null;
+    return txt;
+  }catch(e){
+    console.warn(`[TTG ${route}]`,e?.name||e?.message||e);
+    return null;
+  }
+}
+
+async function requestJson(route,url,timeout,validator){
+  const txt=await requestText(route,url,timeout,null);
+  if(!txt)return null;
+  try{
+    const data=JSON.parse(txt);
+    if(validator&&!validator(data))return null;
+    return data;
+  }catch(e){
+    console.warn(`[TTG ${route}] JSON parse fail`,txt.slice(0,80));
+    return null;
+  }
+}
+
+async function fetchTextNoCache(url,timeout=TTG_PROXY_TIMEOUT,validator=null){
+  const target=cacheBustUrl(url);
+
+  // 직접 요청은 오래 기다리지 않는다.
+  const direct=await requestText('DIRECT',target,Math.min(timeout,TTG_DIRECT_TIMEOUT),validator);
+  if(direct)return direct;
+
+  // 프록시는 순차가 아니라 동시에 요청하고 먼저 성공한 것을 사용한다.
+  return await firstTruthy(proxyRoutes(target).map(r=>
+    requestText(r.name,r.url,timeout,validator)
+  ));
+}
+
+async function fetchJsonNoCache(url,timeout=TTG_PROXY_TIMEOUT,validator=null){
+  const target=cacheBustUrl(url);
+
+  const direct=await requestJson('DIRECT',target,Math.min(timeout,TTG_DIRECT_TIMEOUT),validator);
+  if(direct)return direct;
+
+  return await firstTruthy(proxyRoutes(target).map(r=>
+    requestJson(r.name,r.url,timeout,validator)
+  ));
 }
 
 const KRX_CODE_RE=/^[0-9A-Z]{6}\.(KS|KQ)$/i;
@@ -838,14 +817,8 @@ function isKrxSymbol(sym){return KRX_CODE_RE.test(String(sym||'').toUpperCase())
 function isNumericKrxSymbol(sym){return KRX_NUMERIC_RE.test(String(sym||'').toUpperCase());}
 
 function yahooCandidates(sym){
-  const s=String(sym||'').toUpperCase();
-  if(isKrxSymbol(s)){
-    const code=s.slice(0,6);
-    const suffix=s.slice(6);
-    const alt=suffix==='.KS'?'.KQ':'.KS';
-    return[code+suffix,code+alt];
-  }
-  return[s];
+  // 저장된 거래소 suffix를 그대로 사용한다. 반대 시장까지 재탐색하지 않아 지연/오매칭을 방지한다.
+  return[String(sym||'').toUpperCase()];
 }
 
 function naverPriceFromData(data){
@@ -857,27 +830,25 @@ async function fetchNaverPrice(code){
     `https://api.stock.naver.com/stock/${code}/basic`,
     `https://m.stock.naver.com/api/stock/${code}/basic`
   ];
-  for(const url of urls){
-    try{
-      const data=await fetchJsonNoCache(url,6500,d=>Number(naverPriceFromData(d))>0);
-      if(!data)continue;
-      const p=naverPriceFromData(data);
-      if(!(p>0))continue;
-      const diff=parseMoney(data?.compareToPreviousClosePrice??data?.fluctuations??data?.compareToPreviousPrice);
-      const prevRaw=parseMoney(data?.previousClosePrice??data?.prevClosingPrice??data?.prevClose);
-      const prev=(prevRaw&&prevRaw>0)?prevRaw:(Number.isFinite(diff)?p-diff:p);
-      return{
-        price:p,
-        prev:(prev&&prev>0)?prev:p,
-        source:'Naver',
-        symbol:code,
-        name:data?.stockName||data?.itemName||code
-      };
-    }catch(e){
-      console.warn('[TTG NAVER] price failed',code,e?.message||e);
-    }
-  }
-  return null;
+
+  const result=await firstTruthy(urls.map(async url=>{
+    const data=await fetchJsonNoCache(url,TTG_PROXY_TIMEOUT,d=>Number(naverPriceFromData(d))>0);
+    if(!data)return null;
+    const p=naverPriceFromData(data);
+    if(!(p>0))return null;
+    const diff=parseMoney(data?.compareToPreviousClosePrice??data?.fluctuations??data?.compareToPreviousPrice);
+    const prevRaw=parseMoney(data?.previousClosePrice??data?.prevClosingPrice??data?.prevClose);
+    const prev=(prevRaw&&prevRaw>0)?prevRaw:(Number.isFinite(diff)?p-diff:p);
+    return{
+      price:p,
+      prev:(prev&&prev>0)?prev:p,
+      source:'Naver',
+      symbol:code,
+      name:data?.stockName||data?.itemName||code
+    };
+  }));
+
+  return result||null;
 }
 
 function pickYahooPrice(result){
@@ -887,13 +858,9 @@ function pickYahooPrice(result){
   const latestCandle=lastFinite(q.close);
   const state=String(meta.marketState||'').toUpperCase();
   const candidates=[];
-
-  // 프리/애프터 장에서는 해당 가격을 먼저 사용하고,
-  // 그 외에는 최신 1분봉 -> 정규장 -> 전일종가 순으로 사용한다.
   if(state.includes('PRE'))candidates.push(meta.preMarketPrice);
   if(state.includes('POST'))candidates.push(meta.postMarketPrice);
   candidates.push(latestCandle,meta.postMarketPrice,meta.preMarketPrice,meta.regularMarketPrice,meta.previousClose);
-
   for(const x of candidates){
     const n=Number(x);
     if(Number.isFinite(n)&&n>0){
@@ -904,66 +871,54 @@ function pickYahooPrice(result){
   return null;
 }
 
+async function fetchYahooOneSymbol(s){
+  const hosts=['query1.finance.yahoo.com','query2.finance.yahoo.com'];
+  return await firstTruthy(hosts.map(async host=>{
+    const url=`https://${host}/v8/finance/chart/${encodeURIComponent(s)}?interval=1m&range=1d&includePrePost=true`;
+    const data=await fetchJsonNoCache(url,TTG_PROXY_TIMEOUT,d=>Array.isArray(d?.chart?.result)&&!!d.chart.result[0]);
+    const result=data?.chart?.result?.[0];
+    const picked=pickYahooPrice(result);
+    if(!picked||!(picked.price>0))return null;
+    return{
+      price:picked.price,
+      prev:picked.prev,
+      source:host.startsWith('query1')?'Yahoo1':'Yahoo2',
+      symbol:s,
+      name:result?.meta?.longName||result?.meta?.shortName||s
+    };
+  }));
+}
+
 async function fetchYahooPrice(sym){
-  for(const s of yahooCandidates(sym)){
-    for(const host of ['query1.finance.yahoo.com','query2.finance.yahoo.com']){
-      try{
-        const url=`https://${host}/v8/finance/chart/${encodeURIComponent(s)}?interval=1m&range=1d&includePrePost=true`;
-        const data=await fetchJsonNoCache(
-          url,
-          6500,
-          d=>Array.isArray(d?.chart?.result)&&!!d.chart.result[0]
-        );
-        const result=data?.chart?.result?.[0];
-        const picked=pickYahooPrice(result);
-        if(picked&&picked.price>0){
-          return{
-            price:picked.price,
-            prev:picked.prev,
-            source:host.startsWith('query1')?'Yahoo1':'Yahoo2',
-            symbol:s,
-            name:result?.meta?.longName||result?.meta?.shortName||s
-          };
-        }
-      }catch(e){
-        console.warn('[TTG YAHOO] price failed',s,host,e?.message||e);
-      }
-    }
-  }
+  const candidates=yahooCandidates(sym);
+  // 요청된 시장(.KS/.KQ)을 먼저 확인하고, 그것이 실패할 때만 반대 시장을 확인한다.
+  const first=await fetchYahooOneSymbol(candidates[0]);
+  if(first)return first;
+  if(candidates.length>1)return await fetchYahooOneSymbol(candidates[1]);
   return null;
 }
 
 async function fetchStooqPrice(sym){
   if(/\./.test(sym)||/^\d/.test(sym))return null;
-  try{
-    const url=`https://stooq.com/q/l/?s=${sym.toLowerCase()}.us&f=sd2t2ohlcv&h&e=csv`;
-    const txt=await fetchTextNoCache(url,6500,t=>/Symbol/i.test(t)&&t.trim().split(/\r?\n/).length>=2);
-    if(!txt)return null;
-    const lines=txt.trim().split(/\r?\n/);
-    if(lines.length<2)return null;
-    const cols=lines[1].split(',');
-    const close=parseMoney(cols[6]||cols[4]);
-    if(close&&close>0)return{price:close,prev:close,source:'Stooq',symbol:sym,name:sym};
-  }catch(e){
-    console.warn('[TTG STOOQ] price failed',sym,e?.message||e);
-  }
+  const url=`https://stooq.com/q/l/?s=${sym.toLowerCase()}.us&f=sd2t2ohlcv&h&e=csv`;
+  const txt=await fetchTextNoCache(url,TTG_PROXY_TIMEOUT,t=>/Symbol/i.test(t)&&t.trim().split(/\r?\n/).length>=2);
+  if(!txt)return null;
+  const lines=txt.trim().split(/\r?\n/);
+  if(lines.length<2)return null;
+  const cols=lines[1].split(',');
+  const close=parseMoney(cols[6]||cols[4]);
+  if(close&&close>0)return{price:close,prev:close,source:'Stooq',symbol:sym,name:sym};
   return null;
 }
 
-function delay(ms){return new Promise(r=>setTimeout(r,ms));}
-
-async function preferredPrice(primaryFn,fallbackFns=[],waitMs=2600){
+// 주 소스를 최대 약 3.1초만 기다린 뒤 fallback으로 간다.
+async function preferredPrice(primaryFn,fallbackFns=[]){
   try{
-    const primary=primaryFn();
-    const fast=await Promise.race([primary,delay(waitMs).then(()=>null)]);
-    if(fast&&fast.price)return fast;
-    const fallback=await firstSuccessful(fallbackFns);
-    if(fallback&&fallback.price)return fallback;
-    const late=await primary.catch(()=>null);
-    return late&&late.price?late:null;
-  }catch(e){
-    return await firstSuccessful(fallbackFns);
-  }
+    const primary=await primaryFn();
+    if(primary&&primary.price)return primary;
+  }catch(e){}
+  if(!fallbackFns.length)return null;
+  return await firstTruthy(fallbackFns.map(fn=>Promise.resolve().then(fn).catch(()=>null)));
 }
 
 async function fetchPrice(sym){
@@ -971,11 +926,11 @@ async function fetchPrice(sym){
   if(isKrxSymbol(s)){
     const code=s.slice(0,6);
     if(/^\d{6}$/.test(code)){
-      return await preferredPrice(()=>fetchNaverPrice(code),[()=>fetchYahooPrice(s)],2600);
+      return await preferredPrice(()=>fetchNaverPrice(code),[()=>fetchYahooPrice(s)]);
     }
-    return await preferredPrice(()=>fetchYahooPrice(s),[()=>fetchNaverPrice(code)],3000);
+    return await preferredPrice(()=>fetchYahooPrice(s),[()=>fetchNaverPrice(code)]);
   }
-  return await preferredPrice(()=>fetchYahooPrice(s),[()=>fetchStooqPrice(s)],3000);
+  return await preferredPrice(()=>fetchYahooPrice(s),[()=>fetchStooqPrice(s)]);
 }
 
 async function runWithConcurrency(items,limit,worker){
@@ -990,94 +945,151 @@ async function runWithConcurrency(items,limit,worker){
   await Promise.all(workers);
 }
 
+async function fetchFX(updateScreen=true,notify=false){
+  const oldFx=Number(RT.fx)||1504.77;
+  const stamp=Date.now();
+  const sources=[
+    {name:'ER-API',url:`https://open.er-api.com/v6/latest/USD?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
+    {name:'Frankfurter',url:`https://api.frankfurter.app/latest?from=USD&to=KRW&_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
+    {name:'CurrencyAPI',url:`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.usd?.krw)},
+    {name:'Yahoo FX',url:`https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d&_=${stamp}`,type:'json',parse:parseYahooFx},
+    {name:'Stooq USDKRW',url:`https://stooq.com/q/l/?s=usdkrw&f=sd2t2ohlcv&h&e=csv&_=${stamp}`,type:'text',parse:parseStooqFxCsv}
+  ];
+
+  const winner=await firstTruthy(sources.map(async src=>{
+    try{
+      const raw=src.type==='text'
+        ? await fetchTextNoCache(src.url,TTG_PROXY_TIMEOUT)
+        : await fetchJsonNoCache(src.url,TTG_PROXY_TIMEOUT);
+      const fx=src.parse(raw);
+      return fx?{fx,source:src.name}:null;
+    }catch(e){return null;}
+  }));
+
+  if(winner?.fx){
+    RT.fx=winner.fx;
+    RT.fxSource=winner.source;
+    RT.fxTime=new Date().toLocaleTimeString('ko-KR');
+    localStorage.setItem('ttg_rt3',JSON.stringify(RT));
+    ['ov-fx','rt-fx'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=RT.fx.toLocaleString(undefined,{maximumFractionDigits:2});});
+    if(updateScreen){renderOV();renderRT();renderLogChart();if(document.getElementById('pg-dy')?.classList.contains('on'))renderDY();}
+    if(notify){const diff=RT.fx-oldFx;toast(`환율 갱신: ${RT.fx.toLocaleString(undefined,{maximumFractionDigits:2})}원 (${diff>=0?'+':''}${diff.toFixed(2)}) · ${winner.source}`);}
+    return RT.fx;
+  }
+
+  if(notify)toast('환율 API 응답 실패 · 기존 환율 유지',true);
+  return oldFx;
+}
+async function refreshFXManual(){await fetchFX(true,true);}
+
 async function refreshPrices(silent=false,saveRemote=false){
+  if(PRICE_REFRESH_RUNNING){
+    if(!silent)toast('이미 시세를 새로고침 중입니다');
+    return;
+  }
+  PRICE_REFRESH_RUNNING=true;
+  const started=performance.now();
   const spin=document.getElementById('rspin');
   if(spin)spin.style.display='inline-block';
 
-  const before=grand(RT.fx||1504.77);
-  const fx=await fetchFX(false);
-  const keys=[...new Set(H.map(h=>h.sym||h.krx).filter(Boolean))];
-  const pm={},prevMap={},src={},failed=[];
+  try{
+    const before=grand(RT.fx||1504.77);
+    const keys=[...new Set(H.map(h=>h.sym||h.krx).filter(Boolean))];
+    const pm={},prevMap={},src={},failed=[];
+    let completed=0;
 
-  // 공개 프록시의 순간 rate-limit을 피하기 위해 동시 요청을 4개로 제한한다.
-  await runWithConcurrency(keys,4,async k=>{
-    try{
-      const res=await fetchPrice(k);
-      if(res&&Number(res.price)>0){
-        pm[k]=Number(res.price);
-        prevMap[k]=Number(res.prev)>0?Number(res.prev):Number(res.price);
-        src[k]=res.source+(res.symbol&&res.symbol!==k?`:${res.symbol}`:'');
-        console.log('[TTG PRICE OK]',k,pm[k],src[k]);
-      }else{
+    // 환율과 종목 시세를 동시에 시작한다. 환율 때문에 시세 시작이 지연되지 않는다.
+    const fxPromise=fetchFX(false,false);
+
+    // 동시 9종. 각 종목은 실패해도 빠르게 종료하도록 통신 timeout을 짧게 잡았다.
+    await runWithConcurrency(keys,9,async k=>{
+      try{
+        const res=await fetchPrice(k);
+        if(res&&Number(res.price)>0){
+          pm[k]=Number(res.price);
+          prevMap[k]=Number(res.prev)>0?Number(res.prev):Number(res.price);
+          src[k]=res.source+(res.symbol&&res.symbol!==k?`:${res.symbol}`:'');
+          console.log('[TTG PRICE OK]',k,pm[k],src[k]);
+        }else{
+          failed.push(k);
+          console.warn('[TTG PRICE FAIL]',k);
+        }
+      }catch(e){
         failed.push(k);
-        console.warn('[TTG PRICE FAIL]',k);
+        console.error('[TTG PRICE EXCEPTION]',k,e);
+      }finally{
+        completed++;
+        const lu=document.getElementById('lu');
+        if(lu)lu.textContent=`시세 받는 중 ${completed}/${keys.length}종...`;
       }
-    }catch(e){
-      failed.push(k);
-      console.error('[TTG PRICE EXCEPTION]',k,e);
-    }
-  });
-
-  let changed=0;
-  H.forEach(h=>{
-    const k=h.sym||h.krx;
-    if(k&&Number(pm[k])>0){
-      if(Math.abs(Number(h.p)-Number(pm[k]))>0.000001)changed++;
-      h.prev=Number(prevMap[k])>0?Number(prevMap[k]):Number(h.p);
-      h.p=Number(pm[k]);
-      h.src=src[k]||'API';
-    }
-  });
-
-  const after=grand(fx);
-  const now=new Date().toLocaleTimeString('ko-KR');
-  const okCount=Object.keys(pm).length;
-  let status='';
-  if(okCount===0){
-    status=`${now} 시세 API 응답 0/${keys.length}종`;
-  }else if(failed.length){
-    status=`${now} 시세 ${okCount}/${keys.length}종 · 실패 ${failed.length}종 · 변동 ${changed}개 · ${fmtSignedM(after-before)}`;
-  }else{
-    status=`${now} 시세 ${okCount}/${keys.length}종 · 변동 ${changed}개 · ${fmtSignedM(after-before)}`;
-  }
-
-  const lu=document.getElementById('lu');
-  if(lu)lu.textContent=status;
-  const rtLast=document.getElementById('rt-last');
-  if(rtLast)rtLast.textContent=status;
-  if(spin)spin.style.display='none';
-
-  localStorage.setItem('ttg_h3',JSON.stringify(H));
-  localStorage.setItem('ttg_rt3',JSON.stringify(RT));
-
-  saveLastTotal();
-  window._pricesLoaded=okCount>0;
-
-  if(saveRemote&&okCount>0){
-    await fbSaveSilent('config','holdings',{
-      items:H,
-      lastPriceRefresh:new Date().toISOString(),
-      fx:RT.fx,
-      fxSource:RT.fxSource||''
     });
-  }
 
-  renderAll();
+    const fx=await fxPromise;
 
-  if(!silent){
+    let changed=0;
+    H.forEach(h=>{
+      const k=h.sym||h.krx;
+      if(k&&Number(pm[k])>0){
+        if(Math.abs(Number(h.p)-Number(pm[k]))>0.000001)changed++;
+        h.prev=Number(prevMap[k])>0?Number(prevMap[k]):Number(h.p);
+        h.p=Number(pm[k]);
+        h.src=src[k]||'API';
+      }
+    });
+
+    const after=grand(fx);
+    const now=new Date().toLocaleTimeString('ko-KR');
+    const okCount=Object.keys(pm).length;
+    const sec=((performance.now()-started)/1000).toFixed(1);
+    let status='';
     if(okCount===0){
-      toast(`시세 API 응답 0/${keys.length}종 · F12 Console 확인`,true);
+      status=`${now} 시세 API 응답 0/${keys.length}종 · ${sec}초`;
     }else if(failed.length){
-      toast(`시세 ${okCount}/${keys.length}종 수신 · 실패 ${failed.length}종`,true);
-    }else if(changed===0){
-      toast(`시세 수신 성공 ${okCount}/${keys.length}종 · 가격변동 없음`);
+      status=`${now} 시세 ${okCount}/${keys.length}종 · 실패 ${failed.length}종 · 변동 ${changed}개 · ${sec}초`;
     }else{
-      toast(`시세 업데이트 완료: ${okCount}/${keys.length}종 · 변동 ${changed}개`);
+      status=`${now} 시세 ${okCount}/${keys.length}종 · 변동 ${changed}개 · ${sec}초`;
     }
-  }
 
-  if(failed.length)console.warn('[TTG FAILED SYMBOLS]',failed);
+    const lu=document.getElementById('lu');
+    if(lu)lu.textContent=status;
+    const rtLast=document.getElementById('rt-last');
+    if(rtLast)rtLast.textContent=status;
+
+    localStorage.setItem('ttg_h3',JSON.stringify(H));
+    localStorage.setItem('ttg_rt3',JSON.stringify(RT));
+    saveLastTotal();
+    window._pricesLoaded=okCount>0;
+
+    if(saveRemote&&okCount>0){
+      await fbSaveSilent('config','holdings',{
+        items:H,
+        lastPriceRefresh:new Date().toISOString(),
+        fx:RT.fx,
+        fxSource:RT.fxSource||''
+      });
+    }
+
+    renderAll();
+
+    if(!silent){
+      if(okCount===0){
+        toast(`시세 0/${keys.length}종 · 외부 시세 연결 실패 (${sec}초)`,true);
+      }else if(failed.length){
+        toast(`시세 ${okCount}/${keys.length}종 수신 · 실패 ${failed.length}종 · ${sec}초`,true);
+      }else if(changed===0){
+        toast(`시세 ${okCount}/${keys.length}종 수신 성공 · 변동 없음 · ${sec}초`);
+      }else{
+        toast(`시세 업데이트 완료 ${okCount}/${keys.length}종 · 변동 ${changed}개 · ${sec}초`);
+      }
+    }
+
+    if(failed.length)console.warn('[TTG FAILED SYMBOLS]',failed);
+  }finally{
+    if(spin)spin.style.display='none';
+    PRICE_REFRESH_RUNNING=false;
+  }
 }
+
 
 async function fbSave(col,id,data){if(!window._fbReady||!window._user){toast('Google 로그인 후 저장 가능합니다',true);return false;}try{const{doc,setDoc}=window._fs;await setDoc(doc(window._db,col,id),data);document.getElementById('sync-dot').className='sync-dot ok';return true;}catch(e){document.getElementById('sync-dot').className='sync-dot';return false;}}
 async function fbSaveSilent(col,id,data){if(!window._fbReady||!window._user)return false;try{const{doc,setDoc}=window._fs;await setDoc(doc(window._db,col,id),data);document.getElementById('sync-dot').className='sync-dot ok';return true;}catch(e){document.getElementById('sync-dot').className='sync-dot';return false;}}
