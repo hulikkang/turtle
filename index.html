@@ -287,7 +287,7 @@ input[type=number]{text-align:left;}
 
 <body>
 <nav class="nav">
-  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v3.1</div></div>
+  <div><div class="logo">거북투자종합회사</div><div class="logo-s">우리집 자산관리 v3.1 · SINGLE HTML</div></div>
   <div class="tabs">
     <div class="tab on" onclick="sp('ov')">개요</div>
     <div class="tab" onclick="sp('rt')">실시간</div>
@@ -754,13 +754,12 @@ async function fetchFX(updateScreen=true,notify=false){
   const oldFx=Number(RT.fx)||1504.77;
   const stamp=Date.now();
   const sources=[
+    {name:'ER-API',url:`https://open.er-api.com/v6/latest/USD?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
+    {name:'Frankfurter',url:`https://api.frankfurter.app/latest?from=USD&to=KRW&_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
+    {name:'CurrencyAPI',url:`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.usd?.krw)},
     {name:'Yahoo FX 1m',url:`https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d&_=${stamp}`,type:'json',parse:parseYahooFx},
     {name:'Yahoo FX 5m',url:`https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=5m&range=1d&_=${stamp}`,type:'json',parse:parseYahooFx},
-    {name:'Stooq USDKRW',url:`https://stooq.com/q/l/?s=usdkrw&f=sd2t2ohlcv&h&e=csv&_=${stamp}`,type:'text',parse:parseStooqFxCsv},
-    {name:'ER-API',url:`https://open.er-api.com/v6/latest/USD?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
-    {name:'ExchangeRateAPI',url:`https://api.exchangerate-api.com/v4/latest/USD?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
-    {name:'Frankfurter',url:`https://api.frankfurter.app/latest?from=USD&to=KRW&_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.rates?.KRW)},
-    {name:'CurrencyAPI',url:`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json?_=${stamp}`,type:'json',parse:d=>parseFxCandidate(d?.usd?.krw)}
+    {name:'Stooq USDKRW',url:`https://stooq.com/q/l/?s=usdkrw&f=sd2t2ohlcv&h&e=csv&_=${stamp}`,type:'text',parse:parseStooqFxCsv}
   ];
   const tried=[];
   for(const src of sources){
@@ -794,90 +793,61 @@ async function fetchWithTimeout(url,opts={},timeout=7000){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeout);
   try{
-    return await fetch(url,{...opts,signal:controller.signal,cache:'no-store'});
+    return await fetch(url,{
+      ...opts,
+      cache:'no-store',
+      credentials:'omit',
+      signal:controller.signal
+    });
   }finally{
     clearTimeout(timer);
   }
 }
 
-async function readProxyResponse(response,isAllOriginsGet=false){
-  if(!response?.ok)return null;
-  const txt=await response.text();
-  if(!txt)return null;
-
-  if(isAllOriginsGet){
-    try{
-      const obj=JSON.parse(txt);
-      return typeof obj?.contents==='string' ? obj.contents : null;
-    }catch(e){
-      return null;
-    }
-  }
-
-  return txt;
-}
-
 async function fetchTextNoCache(url,timeout=7000){
   const u=url+(url.includes('?')?'&':'?')+'_ts='+Date.now();
 
-  // Yahoo Finance 등은 브라우저 직접 호출이 CORS로 차단될 수 있으므로
-  // 프록시들을 "순차 대기"하지 않고 동시에 요청해 가장 먼저 성공한 응답을 사용한다.
-  const candidates=[
-    {
-      name:'AllOrigins raw',
-      url:'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
-      wrapper:false
-    },
-    {
-      name:'AllOrigins get',
-      url:'https://api.allorigins.win/get?url='+encodeURIComponent(u),
-      wrapper:true
-    },
-    {
-      name:'CorsProxy',
-      url:'https://corsproxy.io/?url='+encodeURIComponent(u),
-      wrapper:false
-    },
-    {
-      name:'Direct',
-      url:u,
-      wrapper:false
-    }
+  // GitHub Pages 같은 정적 HTML에서 Yahoo/Naver CORS를 우회하기 위한 공개 GET proxy.
+  // 1순위: proxy.cors.dev
+  // 그 뒤 기존 경로들을 fallback으로 둔다.
+  const urls=[
+    'https://proxy.cors.dev/'+u,
+    u,
+    'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+    'https://corsproxy.io/?url='+encodeURIComponent(u)
   ];
 
-  return await new Promise(resolve=>{
-    let finished=false;
-    let left=candidates.length;
+  let lastError='';
 
-    const done=(value)=>{
-      if(finished)return;
-      if(value){
-        finished=true;
-        resolve(value);
-        return;
+  for(const x of urls){
+    try{
+      const r=await fetchWithTimeout(x,{},timeout);
+      if(!r.ok){
+        lastError=`HTTP ${r.status}`;
+        continue;
       }
-      left--;
-      if(left<=0){
-        finished=true;
-        resolve(null);
-      }
-    };
 
-    candidates.forEach(c=>{
-      fetchWithTimeout(c.url,{},timeout)
-        .then(r=>readProxyResponse(r,c.wrapper))
-        .then(txt=>done(txt))
-        .catch(()=>done(null));
-    });
-  });
+      const txt=await r.text();
+      if(txt && txt.trim())return txt;
+
+      lastError='빈 응답';
+    }catch(e){
+      lastError=e?.message||String(e);
+    }
+  }
+
+  console.warn('fetchTextNoCache 실패:',url,lastError);
+  return null;
 }
 
 async function fetchJsonNoCache(url,timeout=7000){
   const txt=await fetchTextNoCache(url,timeout);
   if(!txt)return null;
+
   try{
     return JSON.parse(txt);
   }catch(e){
+    console.warn('JSON parse 실패:',url,String(txt).slice(0,180));
     return null;
   }
 }
@@ -947,23 +917,12 @@ async function refreshPrices(silent=false,saveRemote=false){
   const fx=await fetchFX(false);
   const keys=[...new Set(H.map(h=>h.sym||h.krx).filter(Boolean))];
   const pm={},prevMap={},src={};
-  const failed=[];
-  await Promise.all(keys.map(async k=>{
-    const res=await fetchPrice(k);
-    if(res&&res.price){
-      pm[k]=res.price;
-      prevMap[k]=res.prev||res.price;
-      src[k]=res.source+(res.symbol&&res.symbol!==k?`:${res.symbol}`:'');
-    }else{
-      failed.push(k);
-    }
-  }));
+  await Promise.all(keys.map(async k=>{const res=await fetchPrice(k);if(res&&res.price){pm[k]=res.price;prevMap[k]=res.prev||res.price;src[k]=res.source+(res.symbol&&res.symbol!==k?`:${res.symbol}`:'');}}));
   let changed=0;
   H.forEach(h=>{const k=h.sym||h.krx;if(k&&pm[k]){if(Math.abs(Number(h.p)-Number(pm[k]))>0.000001)changed++;h.prev=(Number(prevMap[k])>0?Number(prevMap[k]):Number(h.p));h.p=Number(pm[k]);h.src=src[k]||'API';}});
   const after=grand(fx);
   const now=new Date().toLocaleTimeString('ko-KR');
-  const failText=failed.length?` · 실패 ${failed.join(', ')}`:'';
-  const status=`${now} 시세 ${Object.keys(pm).length}/${keys.length}종 · 변동 ${changed}개 · ${fmtSignedM(after-before)}${failText}`;
+  const status=`${now} 시세 ${Object.keys(pm).length}/${keys.length}종 · 변동 ${changed}개 · ${fmtSignedM(after-before)}`;
   const lu=document.getElementById('lu');if(lu)lu.textContent=status;
   const rtLast=document.getElementById('rt-last');if(rtLast)rtLast.textContent=status;
   if(spin)spin.style.display='none';
@@ -983,15 +942,9 @@ async function refreshPrices(silent=false,saveRemote=false){
   renderAll();
 
   if(!silent){
-    if(Object.keys(pm).length===0){
-      toast('시세 API 응답 0개 · CORS/프록시 응답을 확인하세요',true);
-    }else if(failed.length){
-      toast(`시세 일부 실패: ${Object.keys(pm).length}/${keys.length}종 · ${failed.join(', ')}`,true);
-    }else if(changed===0){
-      toast(`시세 수신. 가격변동 없음 (${Object.keys(pm).length}/${keys.length}종)`);
-    }else{
-      toast(`시세 업데이트 완료: ${Object.keys(pm).length}/${keys.length}종, 변동 ${changed}개`);
-    }
+    if(Object.keys(pm).length===0)toast('시세 API 응답 0개 · 브라우저 콘솔(F12)에서 fetchTextNoCache 실패를 확인하세요',true);
+    else if(changed===0)toast(`시세 수신. 가격변동 없음 (${Object.keys(pm).length}/${keys.length}종)`);
+    else toast(`시세 업데이트 완료: ${Object.keys(pm).length}/${keys.length}종, 변동 ${changed}개`);
   }
 }
 
