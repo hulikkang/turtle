@@ -790,9 +790,97 @@ async function refreshFXManual(){await fetchFX(true,true);}
 
 function parseMoney(v){if(v===null||v===undefined)return null;if(typeof v==='number')return Number.isFinite(v)?v:null;const s=String(v).replace(/[^\d.-]/g,'');if(!s)return null;const n=Number(s);return Number.isFinite(n)?n:null;}
 function lastFinite(arr){if(!Array.isArray(arr))return null;for(let i=arr.length-1;i>=0;i--){const n=Number(arr[i]);if(Number.isFinite(n)&&n>0)return n;}return null;}
-async function fetchWithTimeout(url,opts={},timeout=3200){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeout);try{return await fetch(url,{...opts,signal:controller.signal});}finally{clearTimeout(timer);}}
-async function fetchTextNoCache(url,timeout=3200){const u=url+(url.includes('?')?'&':'?')+'_ts='+Date.now();const urls=[u,'https://api.allorigins.win/raw?url='+encodeURIComponent(u)+'&_ts='+Date.now(),'https://corsproxy.io/?'+encodeURIComponent(u)];for(const x of urls){try{const r=await fetchWithTimeout(x,{cache:'no-store'},timeout);if(r.ok)return await r.text();}catch(e){}}return null;}
-async function fetchJsonNoCache(url,timeout=3200){const txt=await fetchTextNoCache(url,timeout);if(!txt)return null;try{return JSON.parse(txt);}catch(e){return null;}}
+async function fetchWithTimeout(url,opts={},timeout=7000){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeout);
+  try{
+    return await fetch(url,{...opts,signal:controller.signal,cache:'no-store'});
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
+async function readProxyResponse(response,isAllOriginsGet=false){
+  if(!response?.ok)return null;
+  const txt=await response.text();
+  if(!txt)return null;
+
+  if(isAllOriginsGet){
+    try{
+      const obj=JSON.parse(txt);
+      return typeof obj?.contents==='string' ? obj.contents : null;
+    }catch(e){
+      return null;
+    }
+  }
+
+  return txt;
+}
+
+async function fetchTextNoCache(url,timeout=7000){
+  const u=url+(url.includes('?')?'&':'?')+'_ts='+Date.now();
+
+  // Yahoo Finance 등은 브라우저 직접 호출이 CORS로 차단될 수 있으므로
+  // 프록시들을 "순차 대기"하지 않고 동시에 요청해 가장 먼저 성공한 응답을 사용한다.
+  const candidates=[
+    {
+      name:'AllOrigins raw',
+      url:'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+      wrapper:false
+    },
+    {
+      name:'AllOrigins get',
+      url:'https://api.allorigins.win/get?url='+encodeURIComponent(u),
+      wrapper:true
+    },
+    {
+      name:'CorsProxy',
+      url:'https://corsproxy.io/?url='+encodeURIComponent(u),
+      wrapper:false
+    },
+    {
+      name:'Direct',
+      url:u,
+      wrapper:false
+    }
+  ];
+
+  return await new Promise(resolve=>{
+    let finished=false;
+    let left=candidates.length;
+
+    const done=(value)=>{
+      if(finished)return;
+      if(value){
+        finished=true;
+        resolve(value);
+        return;
+      }
+      left--;
+      if(left<=0){
+        finished=true;
+        resolve(null);
+      }
+    };
+
+    candidates.forEach(c=>{
+      fetchWithTimeout(c.url,{},timeout)
+        .then(r=>readProxyResponse(r,c.wrapper))
+        .then(txt=>done(txt))
+        .catch(()=>done(null));
+    });
+  });
+}
+
+async function fetchJsonNoCache(url,timeout=7000){
+  const txt=await fetchTextNoCache(url,timeout);
+  if(!txt)return null;
+  try{
+    return JSON.parse(txt);
+  }catch(e){
+    return null;
+  }
+}
 async function firstSuccessful(tasks){if(!tasks.length)return null;return await new Promise(resolve=>{let done=false,left=tasks.length;tasks.forEach(fn=>{Promise.resolve().then(fn).then(res=>{if(!done&&res&&res.price){done=true;resolve(res);}}).catch(()=>{}).finally(()=>{left--;if(left===0&&!done)resolve(null);});});});}
 const KRX_CODE_RE=/^[0-9A-Z]{6}\.(KS|KQ)$/i;
 const KRX_BARE_RE=/^[0-9A-Z]{6}$/i;
@@ -810,7 +898,7 @@ function yahooCandidates(sym){
   return[sym];
 }
 async function fetchNaverPrice(code){try{
-  const data=await fetchJsonNoCache(`https://api.stock.naver.com/stock/${code}/basic`);
+  const data=await fetchJsonNoCache(`https://m.stock.naver.com/api/stock/${code}/basic`);
   const p=parseMoney(data?.closePrice||data?.nowVal||data?.lastPrice);
   if(p&&p>0){
     const diff=parseMoney(data?.compareToPreviousClosePrice||data?.fluctuations||data?.compareToPreviousPrice);
@@ -859,12 +947,23 @@ async function refreshPrices(silent=false,saveRemote=false){
   const fx=await fetchFX(false);
   const keys=[...new Set(H.map(h=>h.sym||h.krx).filter(Boolean))];
   const pm={},prevMap={},src={};
-  await Promise.all(keys.map(async k=>{const res=await fetchPrice(k);if(res&&res.price){pm[k]=res.price;prevMap[k]=res.prev||res.price;src[k]=res.source+(res.symbol&&res.symbol!==k?`:${res.symbol}`:'');}}));
+  const failed=[];
+  await Promise.all(keys.map(async k=>{
+    const res=await fetchPrice(k);
+    if(res&&res.price){
+      pm[k]=res.price;
+      prevMap[k]=res.prev||res.price;
+      src[k]=res.source+(res.symbol&&res.symbol!==k?`:${res.symbol}`:'');
+    }else{
+      failed.push(k);
+    }
+  }));
   let changed=0;
   H.forEach(h=>{const k=h.sym||h.krx;if(k&&pm[k]){if(Math.abs(Number(h.p)-Number(pm[k]))>0.000001)changed++;h.prev=(Number(prevMap[k])>0?Number(prevMap[k]):Number(h.p));h.p=Number(pm[k]);h.src=src[k]||'API';}});
   const after=grand(fx);
   const now=new Date().toLocaleTimeString('ko-KR');
-  const status=`${now} 시세 ${Object.keys(pm).length}/${keys.length}종 · 변동 ${changed}개 · ${fmtSignedM(after-before)}`;
+  const failText=failed.length?` · 실패 ${failed.join(', ')}`:'';
+  const status=`${now} 시세 ${Object.keys(pm).length}/${keys.length}종 · 변동 ${changed}개 · ${fmtSignedM(after-before)}${failText}`;
   const lu=document.getElementById('lu');if(lu)lu.textContent=status;
   const rtLast=document.getElementById('rt-last');if(rtLast)rtLast.textContent=status;
   if(spin)spin.style.display='none';
@@ -884,9 +983,15 @@ async function refreshPrices(silent=false,saveRemote=false){
   renderAll();
 
   if(!silent){
-    if(Object.keys(pm).length===0)toast('시세 API 응답 0개',true);
-    else if(changed===0)toast(`시세 수신. 가격변동 없음 (${Object.keys(pm).length}/${keys.length}종)`);
-    else toast(`시세 업데이트 완료: ${Object.keys(pm).length}/${keys.length}종, 변동 ${changed}개`);
+    if(Object.keys(pm).length===0){
+      toast('시세 API 응답 0개 · CORS/프록시 응답을 확인하세요',true);
+    }else if(failed.length){
+      toast(`시세 일부 실패: ${Object.keys(pm).length}/${keys.length}종 · ${failed.join(', ')}`,true);
+    }else if(changed===0){
+      toast(`시세 수신. 가격변동 없음 (${Object.keys(pm).length}/${keys.length}종)`);
+    }else{
+      toast(`시세 업데이트 완료: ${Object.keys(pm).length}/${keys.length}종, 변동 ${changed}개`);
+    }
   }
 }
 
